@@ -1,0 +1,29 @@
+{
+  "name": "unity-remote-control",
+  "version": "1.0.0",
+  "description": "Unity HDRP 遠端模式控制系統",
+  "main": "integrated-server.js",
+  "scripts": {
+    "start": "node integrated-server.js",
+    "dev": "nodemon integrated-server.js",
+    "simple": "node server.js",
+    "web": "node web-server.js"
+  },
+  "keywords": [
+    "unity",
+    "websocket",
+    "remote-control",
+    "hdrp"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "ws": "^8.18.3"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}
