@@ -49,6 +49,24 @@
             font-size: 0.875rem;
             color: #6c757d;
         }
+        .surface-item {
+            border-bottom: 1px solid #dee2e6;
+            padding: 12px 0;
+        }
+        .surface-item:last-child {
+            border-bottom: none;
+        }
+        .form-check-input:checked {
+            background-color: #0d6efd;
+            border-color: #0d6efd;
+        }
+        .settings-icon {
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .settings-icon:hover {
+            transform: rotate(90deg);
+        }
     </style>
 </head>
 <body>
@@ -115,7 +133,7 @@
         </div>
 
         <!-- 連線資訊 -->
-        <div class="card">
+        <div class="card mb-4">
             <div class="card-body">
                 <h6 class="card-subtitle mb-3 text-muted">
                     <i class="bi bi-info-circle"></i> 連線資訊
@@ -132,12 +150,117 @@
                 </div>
             </div>
         </div>
+
+        <!-- MadMapper OSC 控制 -->
+        <div class="card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h6 class="card-subtitle mb-0 text-muted">
+                        <i class="bi bi-broadcast"></i> MadMapper 控制
+                    </h6>
+                    <i class="bi bi-gear settings-icon" data-bs-toggle="modal" data-bs-target="#oscSettingsModal"></i>
+                </div>
+                
+                <div id="surfacesList">
+                    <!-- Surface 控制項目 -->
+                    <div class="surface-item">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <div class="fw-medium">Surface 1</div>
+                                <small class="text-muted">主投影面</small>
+                            </div>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="surface1" 
+                                       onchange="toggleSurface('surface1', this.checked)" checked>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="surface-item">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <div class="fw-medium">Surface 2</div>
+                                <small class="text-muted">副投影面</small>
+                            </div>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="surface2" 
+                                       onchange="toggleSurface('surface2', this.checked)">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="surface-item">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <div class="fw-medium">Surface 3</div>
+                                <small class="text-muted">效果層</small>
+                            </div>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="surface3" 
+                                       onchange="toggleSurface('surface3', this.checked)">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-3">
+                    <button class="btn btn-sm btn-outline-primary w-100" onclick="toggleAllSurfaces(true)">
+                        <i class="bi bi-check-all"></i> 全部開啟
+                    </button>
+                </div>
+                <div class="mt-2">
+                    <button class="btn btn-sm btn-outline-secondary w-100" onclick="toggleAllSurfaces(false)">
+                        <i class="bi bi-x-circle"></i> 全部關閉
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
+
+    <!-- OSC 設定 Modal -->
+    <div class="modal fade" id="oscSettingsModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="bi bi-gear"></i> OSC 設定
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="madmapperIp" class="form-label">MadMapper IP 位址</label>
+                        <input type="text" class="form-control" id="madmapperIp" 
+                               placeholder="192.168.0.3" value="192.168.0.3">
+                        <small class="form-text text-muted">MadMapper 電腦的內網 IP</small>
+                    </div>
+                    <div class="mb-3">
+                        <label for="madmapperPort" class="form-label">OSC 接收端口</label>
+                        <input type="number" class="form-control" id="madmapperPort" 
+                               placeholder="8010" value="8010">
+                        <small class="form-text text-muted">MadMapper OSC 輸入端口（預設 8010）</small>
+                    </div>
+                    <div class="alert alert-info mb-0">
+                        <i class="bi bi-info-circle"></i>
+                        <small>
+                            在 MadMapper 中開啟 Preferences → OSC，啟用 OSC Input 並設定相同端口。
+                        </small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" onclick="saveOSCSettings()">儲存</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
         let ws;
         let currentMode = 0;
-        const serverUrl = 'ws://10.0.1.251:3000'; // 修改為你的伺服器內網 IP
+        const serverUrl = 'ws://192.168.1.100:3000'; // 修改為你的伺服器內網 IP
 
         function connect() {
             ws = new WebSocket(serverUrl);
@@ -219,9 +342,78 @@
             document.getElementById('lastUpdate').textContent = timeStr;
         }
 
+        // MadMapper OSC 控制
+        function toggleSurface(surfaceName, enabled) {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'oscControl',
+                    surface: surfaceName,
+                    enabled: enabled
+                }));
+                console.log(`OSC: ${surfaceName} ${enabled ? '開啟' : '關閉'}`);
+            } else {
+                alert('未連接到伺服器！');
+                // 還原開關狀態
+                document.getElementById(surfaceName).checked = !enabled;
+            }
+        }
+
+        function toggleAllSurfaces(enabled) {
+            const surfaces = ['surface1', 'surface2', 'surface3'];
+            surfaces.forEach(surfaceId => {
+                const checkbox = document.getElementById(surfaceId);
+                if (checkbox.checked !== enabled) {
+                    checkbox.checked = enabled;
+                    toggleSurface(surfaceId, enabled);
+                }
+            });
+        }
+
+        function saveOSCSettings() {
+            const madmapperIp = document.getElementById('madmapperIp').value;
+            const madmapperPort = parseInt(document.getElementById('madmapperPort').value);
+
+            fetch('http://' + serverUrl.replace('ws://', '').replace(':3000', ':8080') + '/api/osc/config', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    madmapperIp: madmapperIp,
+                    madmapperPort: madmapperPort
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('OSC 設定已儲存！');
+                    bootstrap.Modal.getInstance(document.getElementById('oscSettingsModal')).hide();
+                } else {
+                    alert('儲存失敗：' + data.error);
+                }
+            })
+            .catch(error => {
+                alert('儲存失敗：' + error.message);
+            });
+        }
+
+        // 載入 OSC 設定
+        function loadOSCSettings() {
+            fetch('http://' + serverUrl.replace('ws://', '').replace(':3000', ':8080') + '/api/osc/config')
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('madmapperIp').value = data.madmapperIp;
+                document.getElementById('madmapperPort').value = data.madmapperPort;
+            })
+            .catch(error => {
+                console.error('載入 OSC 設定失敗:', error);
+            });
+        }
+
         // 頁面載入時連接
         document.getElementById('serverUrl').textContent = serverUrl;
         connect();
+        loadOSCSettings();
     </script>
 </body>
 </html>
