@@ -11,7 +11,7 @@ const MODE_FILE = 'current_mode.json';
 
 // OSC 設定
 const OSC_CONFIG = {
-    madmapperIp: '192.168.1.190',  // MadMapper 電腦的 IP (請修改)
+    madmapperIp: '192.168.0.189',  // MadMapper 電腦的 IP (請修改)
     madmapperPort: 8010,          // MadMapper 預設 OSC 接收端口
     localPort: 9000               // 本地發送端口
 };
