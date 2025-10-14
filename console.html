@@ -166,12 +166,12 @@
                     <div class="surface-item">
                         <div class="d-flex justify-content-between align-items-center">
                             <div>
-                                <div class="fw-medium">Surface 1</div>
-                                <small class="text-muted">主投影面</small>
+                                <div class="fw-medium">Quad-1</div>
+                                <small class="text-muted">投影機1</small>
                             </div>
                             <div class="form-check form-switch">
-                                <input class="form-check-input" type="checkbox" id="surface1" 
-                                       onchange="toggleSurface('surface1', this.checked)" checked>
+                                <input class="form-check-input" type="checkbox" id="Quad-1" 
+                                       onchange="toggleSurface('Quad-1', this.checked)" checked>
                             </div>
                         </div>
                     </div>
@@ -179,12 +179,12 @@
                     <div class="surface-item">
                         <div class="d-flex justify-content-between align-items-center">
                             <div>
-                                <div class="fw-medium">Surface 2</div>
-                                <small class="text-muted">副投影面</small>
+                                <div class="fw-medium">Quad-2</div>
+                                <small class="text-muted">投影機2</small>
                             </div>
                             <div class="form-check form-switch">
-                                <input class="form-check-input" type="checkbox" id="surface2" 
-                                       onchange="toggleSurface('surface2', this.checked)">
+                                <input class="form-check-input" type="checkbox" id="Quad-2" 
+                                       onchange="toggleSurface('Quad-2', this.checked)">
                             </div>
                         </div>
                     </div>
@@ -192,12 +192,12 @@
                     <div class="surface-item">
                         <div class="d-flex justify-content-between align-items-center">
                             <div>
-                                <div class="fw-medium">Surface 3</div>
-                                <small class="text-muted">效果層</small>
+                                <div class="fw-medium">Quad-3</div>
+                                <small class="text-muted">投影機3</small>
                             </div>
                             <div class="form-check form-switch">
-                                <input class="form-check-input" type="checkbox" id="surface3" 
-                                       onchange="toggleSurface('surface3', this.checked)">
+                                <input class="form-check-input" type="checkbox" id="Quad-3" 
+                                       onchange="toggleSurface('Quad-3', this.checked)">
                             </div>
                         </div>
                     </div>
@@ -260,7 +260,7 @@
     <script>
         let ws;
         let currentMode = 0;
-        const serverUrl = 'ws://192.168.1.100:3000'; // 修改為你的伺服器內網 IP
+        const serverUrl = 'ws://192.168.1.200:3000'; // 修改為你的伺服器內網 IP
 
         function connect() {
             ws = new WebSocket(serverUrl);
@@ -359,7 +359,7 @@
         }
 
         function toggleAllSurfaces(enabled) {
-            const surfaces = ['surface1', 'surface2', 'surface3'];
+            const surfaces = ['Quad-1', 'Quad-2', 'Quad-3'];
             surfaces.forEach(surfaceId => {
                 const checkbox = document.getElementById(surfaceId);
                 if (checkbox.checked !== enabled) {
@@ -373,41 +373,26 @@
             const madmapperIp = document.getElementById('madmapperIp').value;
             const madmapperPort = parseInt(document.getElementById('madmapperPort').value);
 
-            fetch('http://' + serverUrl.replace('ws://', '').replace(':3000', ':8080') + '/api/osc/config', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    madmapperIp: madmapperIp,
-                    madmapperPort: madmapperPort
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    alert('OSC 設定已儲存！');
-                    bootstrap.Modal.getInstance(document.getElementById('oscSettingsModal')).hide();
-                } else {
-                    alert('儲存失敗：' + data.error);
-                }
-            })
-            .catch(error => {
-                alert('儲存失敗：' + error.message);
-            });
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'updateOSCConfig',
+                    config: {
+                        madmapperIp: madmapperIp,
+                        madmapperPort: madmapperPort
+                    }
+                }));
+            } else {
+                alert('未連接到伺服器！');
+            }
         }
 
         // 載入 OSC 設定
         function loadOSCSettings() {
-            fetch('http://' + serverUrl.replace('ws://', '').replace(':3000', ':8080') + '/api/osc/config')
-            .then(response => response.json())
-            .then(data => {
-                document.getElementById('madmapperIp').value = data.madmapperIp;
-                document.getElementById('madmapperPort').value = data.madmapperPort;
-            })
-            .catch(error => {
-                console.error('載入 OSC 設定失敗:', error);
-            });
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'getOSCConfig'
+                }));
+            }
         }
 
         // 頁面載入時連接

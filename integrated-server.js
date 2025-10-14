@@ -1,15 +1,38 @@
-// integrated-server.js
-// 整合 WebSocket 和 HTTP 伺服器的完整解決方案
+// server.js
+// WebSocket + OSC 整合伺服器 (不含 HTTP，由 nginx 負責)
 
 const WebSocket = require('ws');
-const http = require('http');
+const osc = require('osc');
 const fs = require('fs');
-const path = require('path');
 
 // 設定
 const WS_PORT = 3000;
-const HTTP_PORT = 8080;
 const MODE_FILE = 'current_mode.json';
+
+// OSC 設定
+const OSC_CONFIG = {
+    madmapperIp: '192.168.1.190',  // MadMapper 電腦的 IP (請修改)
+    madmapperPort: 8010,          // MadMapper 預設 OSC 接收端口
+    localPort: 9000               // 本地發送端口
+};
+
+// 建立 OSC UDP 端口
+const udpPort = new osc.UDPPort({
+    localAddress: '0.0.0.0',
+    localPort: OSC_CONFIG.localPort,
+    metadata: true
+});
+
+udpPort.open();
+
+udpPort.on('ready', () => {
+    console.log(`\n🎵 OSC 已就緒，監聽端口: ${OSC_CONFIG.localPort}`);
+    console.log(`   MadMapper 目標: ${OSC_CONFIG.madmapperIp}:${OSC_CONFIG.madmapperPort}`);
+});
+
+udpPort.on('error', (error) => {
+    console.error('❌ OSC 錯誤:', error);
+});
 
 // 載入或初始化當前模式
 let currentMode = 1;
@@ -39,9 +62,10 @@ const unityClients = new Set();
 const webClients = new Set();
 
 console.log('╔════════════════════════════════════════╗');
-console.log('║   Unity 遠端控制系統 - 整合伺服器     ║');
+console.log('║  Unity 遠端控制系統 - WebSocket+OSC   ║');
 console.log('╚════════════════════════════════════════╝');
 console.log(`\n🔌 WebSocket 伺服器: ws://0.0.0.0:${WS_PORT}`);
+console.log(`📝 網頁由 nginx 提供`);
 
 wss.on('connection', (ws, req) => {
     const clientIp = req.socket.remoteAddress;
@@ -117,6 +141,49 @@ wss.on('connection', (ws, req) => {
                 }));
             }
             
+            // OSC 設定查詢
+            if (data.type === 'getOSCConfig') {
+                ws.send(JSON.stringify({
+                    type: 'oscConfig',
+                    config: OSC_CONFIG,
+                    timestamp: Date.now()
+                }));
+            }
+            
+            // OSC 設定更新
+            if (data.type === 'updateOSCConfig') {
+                updateOSCConfig(data.config);
+                
+                // 回傳更新結果
+                ws.send(JSON.stringify({
+                    type: 'oscConfigUpdated',
+                    config: OSC_CONFIG,
+                    success: true,
+                    timestamp: Date.now()
+                }));
+                
+                // 廣播給其他客戶端
+                broadcast({
+                    type: 'oscConfigUpdated',
+                    config: OSC_CONFIG,
+                    timestamp: Date.now()
+                }, ws);
+            }
+            
+            // OSC 控制 MadMapper
+            if (data.type === 'oscControl') {
+                handleOSCControl(data);
+                
+                // 廣播給其他客戶端更新狀態
+                broadcast({
+                    type: 'oscStatusUpdate',
+                    surface: data.surface,
+                    parameter: data.parameter || 'opacity',
+                    value: data.value !== undefined ? data.value : (data.enabled ? 1.0 : 0.0),
+                    timestamp: Date.now()
+                }, ws);
+            }
+            
         } catch (error) {
             console.error('❌ 解析訊息錯誤:', error.message);
         }
@@ -154,70 +221,52 @@ function broadcast(data, excludeWs = null) {
     }
 }
 
-// HTTP 伺服器（提供網頁）
-const httpServer = http.createServer((req, res) => {
-    // API 端點
-    if (req.url === '/api/status') {
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({
-            currentMode,
-            clients: clients.size,
-            unityClients: unityClients.size,
-            webClients: webClients.size,
-            uptime: process.uptime(),
-            timestamp: Date.now()
-        }));
-        return;
+// 處理 OSC 控制
+function handleOSCControl(data) {
+    let oscAddress, oscValue;
+    
+    // 支援兩種格式
+    if (data.parameter) {
+        // 格式 1: 指定參數和值
+        oscAddress = `/surfaces/${data.surface}/${data.parameter}`;
+        oscValue = parseFloat(data.value);
+    } else {
+        // 格式 2: 簡單的開關 (enabled: true/false)
+        oscAddress = `/surfaces/${data.surface}/opacity`;
+        oscValue = data.enabled ? 1.0 : 0.0;
     }
     
-    if (req.url === '/api/mode' && req.method === 'GET') {
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ mode: currentMode }));
-        return;
+    console.log(`\n🎵 發送 OSC 訊息:`);
+    console.log(`   位址: ${oscAddress}`);
+    console.log(`   值: ${oscValue}`);
+    console.log(`   目標: ${OSC_CONFIG.madmapperIp}:${OSC_CONFIG.madmapperPort}`);
+    
+    try {
+        udpPort.send({
+            address: oscAddress,
+            args: [
+                {
+                    type: 'f',  // float
+                    value: oscValue
+                }
+            ]
+        }, OSC_CONFIG.madmapperIp, OSC_CONFIG.madmapperPort);
+        
+        console.log(`   ✅ OSC 訊息已發送`);
+    } catch (error) {
+        console.error(`   ❌ OSC 發送失敗:`, error.message);
     }
-    
-    // 提供 HTML 頁面
-    const filePath = path.join(__dirname, 'index.html');
-    
-    fs.readFile(filePath, (err, content) => {
-        if (err) {
-            if (err.code === 'ENOENT') {
-                res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' });
-                res.end(`
-                    <!DOCTYPE html>
-                    <html>
-                    <head>
-                        <meta charset="utf-8">
-                        <title>檔案未找到</title>
-                        <style>
-                            body { font-family: Arial; text-align: center; padding: 50px; }
-                            h1 { color: #e74c3c; }
-                        </style>
-                    </head>
-                    <body>
-                        <h1>⚠️ index.html 檔案未找到</h1>
-                        <p>請將 index.html 放在與 integrated-server.js 相同的目錄中</p>
-                        <p>當前目錄: ${__dirname}</p>
-                    </body>
-                    </html>
-                `);
-            } else {
-                res.writeHead(500);
-                res.end('伺服器錯誤');
-            }
-        } else {
-            res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-            res.end(content);
-        }
-    });
-});
+}
 
-httpServer.listen(HTTP_PORT, '0.0.0.0', () => {
-    console.log(`🌐 HTTP 伺服器: http://0.0.0.0:${HTTP_PORT}`);
-    console.log(`\n📱 請用手機/平板瀏覽器開啟上述網址`);
-    printNetworkInfo();
-    console.log('\n按 Ctrl+C 停止伺服器\n');
-});
+// 更新 OSC 設定
+function updateOSCConfig(newConfig) {
+    if (newConfig.madmapperIp) OSC_CONFIG.madmapperIp = newConfig.madmapperIp;
+    if (newConfig.madmapperPort) OSC_CONFIG.madmapperPort = parseInt(newConfig.madmapperPort);
+    
+    console.log(`\n🔄 OSC 設定已更新:`);
+    console.log(`   MadMapper IP: ${OSC_CONFIG.madmapperIp}`);
+    console.log(`   MadMapper Port: ${OSC_CONFIG.madmapperPort}`);
+}
 
 // 顯示網路資訊
 function printNetworkInfo() {
@@ -232,7 +281,6 @@ function printNetworkInfo() {
         interfaces[ifname].forEach(iface => {
             if (iface.family === 'IPv4' && !iface.internal) {
                 console.log(`\n📍 ${ifname}:`);
-                console.log(`   網頁: http://${iface.address}:${HTTP_PORT}`);
                 console.log(`   WebSocket: ws://${iface.address}:${WS_PORT}`);
             }
         });
@@ -244,6 +292,10 @@ function printStatus() {
     console.log(`\n📊 連接狀態: 總計 ${clients.size} | Unity ${unityClients.size} | 網頁 ${webClients.size}`);
     console.log(`   當前模式: ${currentMode}`);
 }
+
+// 啟動後顯示資訊
+printNetworkInfo();
+console.log('\n按 Ctrl+C 停止伺服器\n');
 
 // 定期狀態報告
 setInterval(() => {
@@ -263,12 +315,12 @@ process.on('SIGINT', () => {
         message: '伺服器即將關閉'
     });
     
+    // 關閉 OSC
+    udpPort.close();
+    console.log('✅ OSC 已關閉');
+    
     wss.close(() => {
         console.log('✅ WebSocket 伺服器已關閉');
-    });
-    
-    httpServer.close(() => {
-        console.log('✅ HTTP 伺服器已關閉');
         process.exit(0);
     });
     
