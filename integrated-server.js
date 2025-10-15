@@ -7,13 +7,17 @@ const fs = require('fs');
 
 // 設定
 const WS_PORT = 3000;
-const MODE_FILE = 'current_mode.json';
+const STATE_FILE = 'system_state.json'; // 完整狀態檔案
 
 // OSC 設定
 const OSC_CONFIG = {
-    madmapperIp: '192.168.0.189',  // MadMapper 電腦的 IP (請修改)
-    madmapperPort: 8010,          // MadMapper 預設 OSC 接收端口
-    localPort: 9000               // 本地發送端口
+    madmapperIp: '192.168.0.189',      // MadMapper 電腦的 IP
+    madmapperPort: 8010,                // MadMapper OSC 接收端口
+    
+    objectTrackerIp: '192.168.0.199',  // Object Tracker 主機 IP
+    objectTrackerPort: 8000,            // Object Tracker OSC 接收端口
+    
+    localPort: 9000                     // 本地發送端口
 };
 
 // 建立 OSC UDP 端口
@@ -28,30 +32,75 @@ udpPort.open();
 udpPort.on('ready', () => {
     console.log(`\n🎵 OSC 已就緒，監聽端口: ${OSC_CONFIG.localPort}`);
     console.log(`   MadMapper 目標: ${OSC_CONFIG.madmapperIp}:${OSC_CONFIG.madmapperPort}`);
+    console.log(`   ObjectTracker 目標: ${OSC_CONFIG.objectTrackerIp}:${OSC_CONFIG.objectTrackerPort}`);
 });
 
 udpPort.on('error', (error) => {
     console.error('❌ OSC 錯誤:', error);
 });
 
-// 載入或初始化當前模式
-let currentMode = 1;
-if (fs.existsSync(MODE_FILE)) {
-    try {
-        const data = fs.readFileSync(MODE_FILE, 'utf8');
-        currentMode = JSON.parse(data).mode || 1;
-        console.log(`📂 已載入儲存的模式: ${currentMode}`);
-    } catch (error) {
-        console.log('⚠️  無法讀取模式檔案，使用預設模式 1');
+// 系統狀態
+let systemState = {
+    contentMode: 1,      // 內容模式
+    maskMode: 1,         // 投影模式
+    surfaceStates: {}    // Surface 開關狀態
+};
+
+// 初始化所有 Surface 狀態為關閉
+for (let i = 1; i <= 16; i++) {
+    systemState.surfaceStates[`Quad-${i}`] = false;
+}
+
+// 載入系統狀態
+function loadSystemState() {
+    if (fs.existsSync(STATE_FILE)) {
+        try {
+            const data = fs.readFileSync(STATE_FILE, 'utf8');
+            const loaded = JSON.parse(data);
+            
+            // 合併載入的狀態
+            if (loaded.contentMode !== undefined) systemState.contentMode = loaded.contentMode;
+            if (loaded.maskMode !== undefined) systemState.maskMode = loaded.maskMode;
+            if (loaded.surfaceStates) {
+                // 確保所有 Surface 都有狀態
+                for (let i = 1; i <= 16; i++) {
+                    const key = `Quad-${i}`;
+                    if (loaded.surfaceStates[key] !== undefined) {
+                        systemState.surfaceStates[key] = loaded.surfaceStates[key];
+                    }
+                }
+            }
+            
+            console.log(`\n📂 已載入系統狀態:`);
+            console.log(`   內容模式: ${systemState.contentMode}`);
+            console.log(`   投影模式: ${systemState.maskMode}`);
+            const activeSurfaces = Object.values(systemState.surfaceStates).filter(s => s).length;
+            console.log(`   開啟的 Surface: ${activeSurfaces}/16`);
+            return true;
+        } catch (error) {
+            console.log('⚠️  無法讀取狀態檔案:', error.message);
+            console.log('   使用預設狀態');
+            return false;
+        }
+    } else {
+        console.log('📝 狀態檔案不存在，使用預設狀態');
+        return false;
     }
 }
 
-// 儲存模式到檔案
-function saveMode(mode) {
+// 儲存系統狀態
+function saveSystemState() {
     try {
-        fs.writeFileSync(MODE_FILE, JSON.stringify({ mode, timestamp: new Date().toISOString() }));
+        const stateData = {
+            contentMode: systemState.contentMode,
+            maskMode: systemState.maskMode,
+            surfaceStates: systemState.surfaceStates,
+            timestamp: new Date().toISOString()
+        };
+        fs.writeFileSync(STATE_FILE, JSON.stringify(stateData, null, 2));
+        console.log(`💾 系統狀態已儲存 (${new Date().toLocaleTimeString('zh-TW')})`);
     } catch (error) {
-        console.error('❌ 儲存模式失敗:', error);
+        console.error('❌ 儲存系統狀態失敗:', error.message);
     }
 }
 
@@ -66,6 +115,9 @@ console.log('║  Unity 遠端控制系統 - WebSocket+OSC   ║');
 console.log('╚════════════════════════════════════════╝');
 console.log(`\n🔌 WebSocket 伺服器: ws://0.0.0.0:${WS_PORT}`);
 console.log(`📝 網頁由 nginx 提供`);
+
+// 載入系統狀態
+loadSystemState();
 
 wss.on('connection', (ws, req) => {
     const clientIp = req.socket.remoteAddress;
@@ -82,10 +134,17 @@ wss.on('connection', (ws, req) => {
         connectedAt: new Date()
     };
 
-    // 發送當前模式
+    // 發送當前模式和系統狀態
     ws.send(JSON.stringify({
         type: 'modeUpdate',
-        mode: currentMode,
+        mode: systemState.contentMode,
+        timestamp: Date.now()
+    }));
+    
+    // 發送完整系統狀態
+    ws.send(JSON.stringify({
+        type: 'systemStateUpdate',
+        state: systemState,
         timestamp: Date.now()
     }));
 
@@ -107,18 +166,18 @@ wss.on('connection', (ws, req) => {
             
             // 模式切換請求
             if (data.type === 'switchMode') {
-                const oldMode = currentMode;
-                currentMode = data.mode;
-                saveMode(currentMode);
+                const oldMode = systemState.contentMode;
+                systemState.contentMode = data.mode;
+                saveSystemState(); // 儲存完整狀態
                 
-                console.log(`\n🔄 模式切換: ${oldMode} → ${currentMode}`);
+                console.log(`\n🔄 內容模式切換: ${oldMode} → ${systemState.contentMode}`);
                 console.log(`   來源: ${ws.clientInfo.type} (${clientId})`);
                 console.log(`   時間: ${new Date().toLocaleString('zh-TW')}`);
                 
                 // 廣播給所有客戶端
                 broadcast({
                     type: 'modeUpdate',
-                    mode: currentMode,
+                    mode: systemState.contentMode,
                     source: ws.clientInfo.type,
                     timestamp: Date.now()
                 });
@@ -128,7 +187,16 @@ wss.on('connection', (ws, req) => {
             if (data.type === 'getMode') {
                 ws.send(JSON.stringify({
                     type: 'modeUpdate',
-                    mode: currentMode,
+                    mode: systemState.contentMode,
+                    timestamp: Date.now()
+                }));
+            }
+            
+            // 取得系統狀態
+            if (data.type === 'getSystemState') {
+                ws.send(JSON.stringify({
+                    type: 'systemStateUpdate',
+                    state: systemState,
                     timestamp: Date.now()
                 }));
             }
@@ -170,16 +238,43 @@ wss.on('connection', (ws, req) => {
                 }, ws);
             }
             
-            // OSC 控制 MadMapper
-            if (data.type === 'oscControl') {
-                handleOSCControl(data);
+            // MadMapper 控制
+            if (data.type === 'madmapperControl') {
+                const oldState = systemState.surfaceStates[data.surface];
+                
+                handleMadmapperControl(data);
+                
+                // 更新系統狀態
+                systemState.surfaceStates[data.surface] = data.enabled;
+                saveSystemState();
+                
+                console.log(`   Surface 狀態: ${data.surface} ${oldState ? '開啟' : '關閉'} → ${data.enabled ? '開啟' : '關閉'}`);
                 
                 // 廣播給其他客戶端更新狀態
                 broadcast({
-                    type: 'oscStatusUpdate',
+                    type: 'madmapperStatusUpdate',
                     surface: data.surface,
-                    parameter: data.parameter || 'opacity',
-                    value: data.value !== undefined ? data.value : (data.enabled ? 1.0 : 0.0),
+                    enabled: data.enabled,
+                    timestamp: Date.now()
+                }, ws);
+            }
+
+            // Mask 控制
+            if (data.type === 'maskControl') {
+                const oldMode = systemState.maskMode;
+                
+                handleMaskControl(data);
+                
+                // 更新系統狀態
+                systemState.maskMode = data.maskId;
+                saveSystemState();
+                
+                console.log(`   投影模式: ${oldMode} → ${systemState.maskMode}`);
+                
+                // 廣播給其他客戶端更新狀態
+                broadcast({
+                    type: 'maskStatusUpdate',
+                    maskId: data.maskId,
                     timestamp: Date.now()
                 }, ws);
             }
@@ -221,24 +316,15 @@ function broadcast(data, excludeWs = null) {
     }
 }
 
-// 處理 OSC 控制
-function handleOSCControl(data) {
-    let oscAddress, oscValue;
+// MadMapper 控制
+function handleMadmapperControl(data) {
+    const oscAddress = `/surfaces/${data.surface}/opacity`;
+    const oscValue = data.enabled ? 1.0 : 0.0;
     
-    // 支援兩種格式
-    if (data.parameter) {
-        // 格式 1: 指定參數和值
-        oscAddress = `/surfaces/${data.surface}/${data.parameter}`;
-        oscValue = parseFloat(data.value);
-    } else {
-        // 格式 2: 簡單的開關 (enabled: true/false)
-        oscAddress = `/surfaces/${data.surface}/opacity`;
-        oscValue = data.enabled ? 1.0 : 0.0;
-    }
-    
-    console.log(`\n🎵 發送 OSC 訊息:`);
+    console.log(`\n🎨 MadMapper 控制:`);
+    console.log(`   Surface: ${data.surface}`);
     console.log(`   位址: ${oscAddress}`);
-    console.log(`   值: ${oscValue}`);
+    console.log(`   值: ${oscValue} (${data.enabled ? '開啟' : '關閉'})`);
     console.log(`   目標: ${OSC_CONFIG.madmapperIp}:${OSC_CONFIG.madmapperPort}`);
     
     try {
@@ -258,14 +344,43 @@ function handleOSCControl(data) {
     }
 }
 
+// Mask 控制
+function handleMaskControl(data) {
+    const oscAddress = '/mask';  // 或根據你的需求設定位址
+    const maskId = parseInt(data.maskId);
+    
+    console.log(`\n🎭 Mask 控制:`);
+    console.log(`   Mask ID: ${maskId}`);
+    console.log(`   位址: ${oscAddress}`);
+    console.log(`   目標: ${OSC_CONFIG.objectTrackerIp}:${OSC_CONFIG.objectTrackerPort}`);
+    
+    try {
+        udpPort.send({
+            address: oscAddress,
+            args: [
+                {
+                    type: 'i',  // integer
+                    value: maskId
+                }
+            ]
+        }, OSC_CONFIG.objectTrackerIp, OSC_CONFIG.objectTrackerPort);
+        
+        console.log(`   ✅ OSC 訊息已發送`);
+    } catch (error) {
+        console.error(`   ❌ OSC 發送失敗:`, error.message);
+    }
+}
+
 // 更新 OSC 設定
 function updateOSCConfig(newConfig) {
     if (newConfig.madmapperIp) OSC_CONFIG.madmapperIp = newConfig.madmapperIp;
     if (newConfig.madmapperPort) OSC_CONFIG.madmapperPort = parseInt(newConfig.madmapperPort);
+    if (newConfig.objectTrackerIp) OSC_CONFIG.objectTrackerIp = newConfig.objectTrackerIp;
+    if (newConfig.objectTrackerPort) OSC_CONFIG.objectTrackerPort = parseInt(newConfig.objectTrackerPort);
     
     console.log(`\n🔄 OSC 設定已更新:`);
-    console.log(`   MadMapper IP: ${OSC_CONFIG.madmapperIp}`);
-    console.log(`   MadMapper Port: ${OSC_CONFIG.madmapperPort}`);
+    console.log(`   MadMapper IP: ${OSC_CONFIG.madmapperIp}:${OSC_CONFIG.madmapperPort}`);
+    console.log(`   ObjectTracker IP: ${OSC_CONFIG.objectTrackerIp}:${OSC_CONFIG.objectTrackerPort}`);
 }
 
 // 顯示網路資訊
@@ -290,7 +405,9 @@ function printNetworkInfo() {
 // 顯示當前狀態
 function printStatus() {
     console.log(`\n📊 連接狀態: 總計 ${clients.size} | Unity ${unityClients.size} | 網頁 ${webClients.size}`);
-    console.log(`   當前模式: ${currentMode}`);
+    console.log(`   內容模式: ${systemState.contentMode} | 投影模式: ${systemState.maskMode}`);
+    const activeSurfaces = Object.keys(systemState.surfaceStates).filter(k => systemState.surfaceStates[k]).length;
+    console.log(`   開啟的 Surface: ${activeSurfaces}/16`);
 }
 
 // 啟動後顯示資訊

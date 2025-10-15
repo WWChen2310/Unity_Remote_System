@@ -18,6 +18,7 @@
         .card {
             border: none;
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin-bottom: 1rem;
         }
         .mode-btn {
             height: 120px;
@@ -42,6 +43,22 @@
             font-size: 2.5rem;
             margin-bottom: 0.5rem;
         }
+        .mask-mode-btn {
+            height: 80px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            transition: all 0.2s;
+            border: 2px solid #dee2e6;
+        }
+        .mask-mode-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        .mask-mode-btn.active {
+            border-color: #0d6efd;
+            background-color: #0d6efd;
+            color: white;
+        }
         .status-badge {
             font-size: 0.875rem;
         }
@@ -49,58 +66,200 @@
             font-size: 0.875rem;
             color: #6c757d;
         }
-        .surface-item {
-            border-bottom: 1px solid #dee2e6;
-            padding: 12px 0;
+        .surface-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
         }
-        .surface-item:last-child {
-            border-bottom: none;
-        }
-        .form-check-input:checked {
-            background-color: #0d6efd;
-            border-color: #0d6efd;
-        }
-        .settings-icon {
+        .surface-toggle {
+            text-align: center;
+            padding: 16px 8px;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            background: white;
+            transition: all 0.2s;
             cursor: pointer;
-            transition: transform 0.2s;
+            user-select: none;
         }
-        .settings-icon:hover {
-            transform: rotate(90deg);
+        .surface-toggle:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+        .surface-toggle.active {
+            background: #0d6efd;
+            border-color: #0d6efd;
+            color: white;
+        }
+        .surface-toggle .surface-name {
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+        .surface-toggle.active .surface-name {
+            color: white;
+        }
+        .surface-toggle .surface-status {
+            font-size: 0.7rem;
+            margin-top: 4px;
+            opacity: 0.7;
+        }
+        .section-hidden {
+            display: none;
         }
     </style>
 </head>
 <body>
     <div class="container">
         <!-- 頁首 -->
-        <div class="card mb-4">
+        <div class="card">
             <div class="card-body text-center">
                 <h3 class="card-title mb-3">
                     <i class="bi bi-controller"></i> Room Interactive 控制台
                 </h3>
                 <span class="badge status-badge" id="statusBadge">
-                    <i class="bi bi-circle-fill" id="statusIcon"></i>
+                    <i class="bi bi-circle-fill"></i>
                     <span id="statusText">未連接</span>
                 </span>
             </div>
         </div>
 
-        <!-- 當前模式 -->
-        <div class="card mb-4">
+        <!-- 當前狀態 -->
+        <div class="card">
             <div class="card-body">
-                <div class="row align-items-center">
-                    <div class="col">
-                        <small class="text-muted">當前模式</small>
-                        <h5 class="mb-0 mt-1" id="currentMode">未知</h5>
+                <div class="row">
+                    <div class="col-6">
+                        <small class="text-muted">內容模式</small>
+                        <h6 class="mb-0 mt-1" id="currentContentMode">未知</h6>
                     </div>
-                    <div class="col-auto">
-                        <i class="bi bi-display fs-1 text-muted"></i>
+                    <div class="col-6">
+                        <small class="text-muted">投影模式</small>
+                        <h6 class="mb-0 mt-1" id="currentMaskMode">未知</h6>
                     </div>
                 </div>
             </div>
         </div>
 
+        <!-- 內容控制 -->
+        <div class="card">
+            <div class="card-body">
+                <h6 class="card-subtitle mb-3 text-muted">
+                    <i class="bi bi-film"></i> 內容控制
+                </h6>
+                <div class="row g-2">
+                    <div class="col-4">
+                        <button class="btn btn-outline-secondary mode-btn w-100" onclick="switchContentMode(1)" id="content1">
+                            <i class="bi bi-1-circle"></i>
+                            <div>內容 1</div>
+                        </button>
+                    </div>
+                    <div class="col-4">
+                        <button class="btn btn-outline-secondary mode-btn w-100" onclick="switchContentMode(2)" id="content2">
+                            <i class="bi bi-2-circle"></i>
+                            <div>內容 2</div>
+                        </button>
+                    </div>
+                    <div class="col-4">
+                        <button class="btn btn-outline-secondary mode-btn w-100" onclick="switchContentMode(3)" id="content3">
+                            <i class="bi bi-3-circle"></i>
+                            <div>內容 3</div>
+                        </button>
+                    </div>
+                    <div class="col-4">
+                        <button class="btn btn-outline-secondary mode-btn w-100" onclick="switchContentMode(4)" id="content4">
+                            <i class="bi bi-4-circle"></i>
+                            <div>內容 4</div>
+                        </button>
+                    </div>
+                    <div class="col-4">
+                        <button class="btn btn-outline-secondary mode-btn w-100" onclick="switchContentMode(5)" id="content5">
+                            <i class="bi bi-5-circle"></i>
+                            <div>內容 5</div>
+                        </button>
+                    </div>
+                    <div class="col-4">
+                        <button class="btn btn-outline-secondary mode-btn w-100" onclick="switchContentMode(6)" id="content6">
+                            <i class="bi bi-6-circle"></i>
+                            <div>內容 6</div>
+                        </button>
+                    </div>
+                    <div class="col-4">
+                        <button class="btn btn-outline-secondary mode-btn w-100" onclick="switchContentMode(7)" id="content7">
+                            <i class="bi bi-7-circle"></i>
+                            <div>內容 7</div>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 投影模式切換 -->
+        <div class="card">
+            <div class="card-body">
+                <h6 class="card-subtitle mb-3 text-muted">
+                    <i class="bi bi-projector"></i> 投影模式
+                </h6>
+                <div class="row g-3">
+                    <div class="col-6">
+                        <button class="btn btn-outline-primary mask-mode-btn w-100" onclick="switchMaskMode(1)" id="mask1">
+                            <i class="bi bi-grid-3x3"></i>
+                            <div>模式一</div>
+                        </button>
+                    </div>
+                    <div class="col-6">
+                        <button class="btn btn-outline-primary mask-mode-btn w-100" onclick="switchMaskMode(2)" id="mask2">
+                            <i class="bi bi-grid-3x3-gap"></i>
+                            <div>模式二</div>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Surface 控制 - 模式一 -->
+        <div class="card" id="surfacesMode1">
+            <div class="card-body">
+                <h6 class="card-subtitle mb-3 text-muted">
+                    <i class="bi bi-grid"></i> Surface 控制 - 模式一
+                </h6>
+                <div class="surface-grid" id="surfaceGridMode1">
+                    <!-- Quad 1-8 將由 JS 動態生成 -->
+                </div>
+                <div class="mt-3">
+                    <button class="btn btn-sm btn-outline-primary w-100" onclick="toggleAllSurfacesInMode(1, true)">
+                        <i class="bi bi-check-all"></i> 全部開啟
+                    </button>
+                </div>
+                <div class="mt-2">
+                    <button class="btn btn-sm btn-outline-secondary w-100" onclick="toggleAllSurfacesInMode(1, false)">
+                        <i class="bi bi-x-circle"></i> 全部關閉
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Surface 控制 - 模式二 -->
+        <div class="card section-hidden" id="surfacesMode2">
+            <div class="card-body">
+                <h6 class="card-subtitle mb-3 text-muted">
+                    <i class="bi bi-grid"></i> Surface 控制 - 模式二
+                </h6>
+                <div class="surface-grid" id="surfaceGridMode2">
+                    <!-- Quad 9-16 將由 JS 動態生成 -->
+                </div>
+                <div class="mt-3">
+                    <button class="btn btn-sm btn-outline-primary w-100" onclick="toggleAllSurfacesInMode(2, true)">
+                        <i class="bi bi-check-all"></i> 全部開啟
+                    </button>
+                </div>
+                <div class="mt-2">
+                    <button class="btn btn-sm btn-outline-secondary w-100" onclick="toggleAllSurfacesInMode(2, false)">
+                        <i class="bi bi-x-circle"></i> 全部關閉
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <!-- 連線資訊 -->
-        <div class="card mb-4">
+        <div class="card">
             <div class="card-body">
                 <h6 class="card-subtitle mb-3 text-muted">
                     <i class="bi bi-info-circle"></i> 連線資訊
@@ -117,195 +276,47 @@
                 </div>
             </div>
         </div>
-
-        <!-- 模式選擇 -->
-        <div class="card mb-4">
-            <div class="card-body">
-                <h6 class="card-subtitle mb-3 text-muted">展示模式</h6>
-                <div class="row g-3">
-                    <div class="col-6">
-                        <button class="btn btn-outline-secondary mode-btn w-100" onclick="switchMode(1)" id="btn1">
-                            <i class="bi bi-brightness-high"></i>
-                            <div>模式一</div>
-                        </button>
-                    </div>
-                    <div class="col-6">
-                        <button class="btn btn-outline-secondary mode-btn w-100" onclick="switchMode(2)" id="btn2">
-                            <i class="bi bi-sunset"></i>
-                            <div>模式二</div>
-                        </button>
-                    </div>
-                    <div class="col-6">
-                        <button class="btn btn-outline-secondary mode-btn w-100" onclick="switchMode(3)" id="btn3">
-                            <i class="bi bi-moon-stars"></i>
-                            <div>模式三</div>
-                        </button>
-                    </div>
-                    <div class="col-6">
-                        <button class="btn btn-outline-secondary mode-btn w-100" onclick="switchMode(4)" id="btn4">
-                            <i class="bi bi-circle-half"></i>
-                            <div>模式四</div>
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="card mb-4">
-            <div class="card-body">
-                <h6 class="card-subtitle mb-3 text-muted">工作模式</h6>
-                <div class="row g-3">
-                    <div class="col-6">
-                        <button class="btn btn-outline-secondary mode-btn w-100" onclick="switchMode(5)" id="btn5">
-                            <i class="bi bi-brightness-high"></i>
-                            <div>模式五</div>
-                        </button>
-                    </div>
-                    <div class="col-6">
-                        <button class="btn btn-outline-secondary mode-btn w-100" onclick="switchMode(6)" id="btn6">
-                            <i class="bi bi-sunset"></i>
-                            <div>模式六</div>
-                        </button>
-                    </div>
-                    <div class="col-6">
-                        <button class="btn btn-outline-secondary mode-btn w-100" onclick="switchMode(7)" id="btn7">
-                            <i class="bi bi-moon-stars"></i>
-                            <div>模式七</div>
-                        </button>
-                    </div>
-                    <!-- <div class="col-6">
-                        <button class="btn btn-outline-secondary mode-btn w-100" onclick="switchMode(4)" id="btn4">
-                            <i class="bi bi-circle-half"></i>
-                            <div>模式四</div>
-                        </button>
-                    </div> -->
-                </div>
-            </div>
-        </div>
-        
-        <!-- MadMapper OSC 控制 -->
-        <div class="card">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h6 class="card-subtitle mb-0 text-muted">
-                        <i class="bi bi-broadcast"></i> 投影機控制
-                    </h6>
-                    <!-- <i class="bi bi-gear settings-icon" data-bs-toggle="modal" data-bs-target="#oscSettingsModal"></i> -->
-                </div>
-                
-                <div id="surfacesList">
-                    <!-- Surface 控制項目 -->
-                    <div class="surface-item">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <div class="fw-medium">Quad-1</div>
-                                <small class="text-muted">投影機1</small>
-                            </div>
-                            <div class="form-check form-switch">
-                                <input class="form-check-input" type="checkbox" id="Quad-1" 
-                                       onchange="toggleSurface('Quad-1', this.checked)" checked>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="surface-item">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <div class="fw-medium">Quad-2</div>
-                                <small class="text-muted">投影機2</small>
-                            </div>
-                            <div class="form-check form-switch">
-                                <input class="form-check-input" type="checkbox" id="Quad-2" 
-                                       onchange="toggleSurface('Quad-2', this.checked)">
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="surface-item">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <div class="fw-medium">Quad-3</div>
-                                <small class="text-muted">投影機3</small>
-                            </div>
-                            <div class="form-check form-switch">
-                                <input class="form-check-input" type="checkbox" id="Quad-3" 
-                                       onchange="toggleSurface('Quad-3', this.checked)">
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="surface-item">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <div class="fw-medium">Mask-1</div>
-                                <small class="text-muted">遮罩1</small>
-                            </div>
-                            <div class="form-check form-switch">
-                                <input class="form-check-input" type="checkbox" id="Mask-1" 
-                                       onchange="toggleSurface('Mask-1', this.checked)">
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="mt-3">
-                    <button class="btn btn-sm btn-outline-primary w-100" onclick="toggleAllSurfaces(true)">
-                        <i class="bi bi-check-all"></i> 全部開啟
-                    </button>
-                </div>
-                <div class="mt-2">
-                    <button class="btn btn-sm btn-outline-secondary w-100" onclick="toggleAllSurfaces(false)">
-                        <i class="bi bi-x-circle"></i> 全部關閉
-                    </button>
-                </div>
-            </div>
-        </div>
     </div>
-
-    <!-- OSC 設定 Modal -->
-    <!-- <div class="modal fade" id="oscSettingsModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">
-                        <i class="bi bi-gear"></i> OSC 設定
-                    </h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="mb-3">
-                        <label for="madmapperIp" class="form-label">MadMapper IP 位址</label>
-                        <input type="text" class="form-control" id="madmapperIp" 
-                               placeholder="192.168.0.3" value="192.168.0.3">
-                        <small class="form-text text-muted">MadMapper 電腦的內網 IP</small>
-                    </div>
-                    <div class="mb-3">
-                        <label for="madmapperPort" class="form-label">OSC 接收端口</label>
-                        <input type="number" class="form-control" id="madmapperPort" 
-                               placeholder="8010" value="8010">
-                        <small class="form-text text-muted">MadMapper OSC 輸入端口（預設 8010）</small>
-                    </div>
-                    <div class="alert alert-info mb-0">
-                        <i class="bi bi-info-circle"></i>
-                        <small>
-                            在 MadMapper 中開啟 Preferences → OSC，啟用 OSC Input 並設定相同端口。
-                        </small>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                    <button type="button" class="btn btn-primary" onclick="saveOSCSettings()">儲存</button>
-                </div>
-            </div>
-        </div>
-    </div> -->
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
         let ws;
-        let currentMode = 0;
-        const serverUrl = 'ws://192.168.0.199:3000'; // 修改為你的伺服器內網 IP
+        let currentContentMode = 0;
+        let currentMaskMode = 1; // 預設模式一
+        const serverUrl = 'ws://192.168.0.199:3000';
+
+        // Surface 狀態追蹤
+        const surfaceStates = {
+            1: {}, // 模式一的 Quad-1~8
+            2: {}  // 模式二的 Quad-9~16
+        };
+
+        // 初始化 Surface 控制介面
+        function initSurfaceGrids() {
+            // 模式一：Quad-1 ~ Quad-8
+            const grid1 = document.getElementById('surfaceGridMode1');
+            for (let i = 1; i <= 8; i++) {
+                surfaceStates[1][i] = false;
+                grid1.innerHTML += createSurfaceToggle(i, 1);
+            }
+
+            // 模式二：Quad-9 ~ Quad-16
+            const grid2 = document.getElementById('surfaceGridMode2');
+            for (let i = 9; i <= 16; i++) {
+                surfaceStates[2][i] = false;
+                grid2.innerHTML += createSurfaceToggle(i, 2);
+            }
+        }
+
+        function createSurfaceToggle(quadNum, mode) {
+            return `
+                <div class="surface-toggle" id="surface${quadNum}" onclick="toggleSingleSurface(${quadNum}, ${mode})">
+                    <div class="surface-name">Quad-${quadNum}</div>
+                    <div class="surface-status" id="status${quadNum}">關閉</div>
+                </div>
+            `;
+        }
 
         function connect() {
             ws = new WebSocket(serverUrl);
@@ -314,18 +325,28 @@
                 updateStatus(true);
                 console.log('WebSocket 已連接');
                 
-                // 識別為網頁客戶端
                 ws.send(JSON.stringify({
                     clientType: 'web',
                     userAgent: navigator.userAgent
                 }));
+
+                // 不要強制初始化，等待伺服器發送狀態
+                console.log('等待伺服器發送系統狀態...');
             };
 
             ws.onmessage = (event) => {
                 const data = JSON.parse(event.data);
+                
                 if (data.type === 'modeUpdate') {
-                    updateCurrentMode(data.mode);
+                    updateContentMode(data.mode);
                 }
+                
+                // 接收完整系統狀態
+                if (data.type === 'systemStateUpdate') {
+                    console.log('收到系統狀態:', data.state);
+                    applySystemState(data.state);
+                }
+                
                 updateLastUpdate();
             };
 
@@ -340,21 +361,8 @@
             };
         }
 
-        function switchMode(mode) {
-            if (ws && ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({
-                    type: 'switchMode',
-                    mode: mode
-                }));
-                updateCurrentMode(mode);
-            } else {
-                alert('未連接到伺服器！');
-            }
-        }
-
         function updateStatus(connected) {
             const badge = document.getElementById('statusBadge');
-            const icon = document.getElementById('statusIcon');
             const text = document.getElementById('statusText');
             
             if (connected) {
@@ -366,17 +374,191 @@
             }
         }
 
-        function updateCurrentMode(mode) {
-            currentMode = mode;
-            document.getElementById('currentMode').textContent = `模式 ${mode}`;
+        // 內容模式切換
+        function switchContentMode(mode) {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'switchMode',
+                    mode: mode
+                }));
+                updateContentMode(mode);
+            } else {
+                alert('未連接到伺服器！');
+            }
+        }
+
+        function updateContentMode(mode) {
+            currentContentMode = mode;
+            document.getElementById('currentContentMode').textContent = `內容 ${mode}`;
             
             // 更新按鈕樣式
-            for (let i = 1; i <= 4; i++) {
-                const btn = document.getElementById(`btn${i}`);
-                if (i === mode) {
-                    btn.className = 'btn btn-primary mode-btn w-100 active';
-                } else {
-                    btn.className = 'btn btn-outline-secondary mode-btn w-100';
+            for (let i = 1; i <= 7; i++) {
+                const btn = document.getElementById(`content${i}`);
+                if (btn) {
+                    if (i === mode) {
+                        btn.className = 'btn btn-primary mode-btn w-100 active';
+                    } else {
+                        btn.className = 'btn btn-outline-secondary mode-btn w-100';
+                    }
+                }
+            }
+        }
+
+        // Mask 模式切換
+        function switchMaskMode(mode) {
+            if (ws && ws.readyState !== WebSocket.OPEN) {
+                alert('未連接到伺服器！');
+                return;
+            }
+
+            currentMaskMode = mode;
+            document.getElementById('currentMaskMode').textContent = `模式 ${mode}`;
+
+            // 更新模式按鈕樣式
+            document.getElementById('mask1').className = mode === 1 ? 
+                'btn btn-primary mask-mode-btn w-100 active' : 
+                'btn btn-outline-primary mask-mode-btn w-100';
+            document.getElementById('mask2').className = mode === 2 ? 
+                'btn btn-primary mask-mode-btn w-100 active' : 
+                'btn btn-outline-primary mask-mode-btn w-100';
+
+            // 切換 Surface 控制區域顯示
+            document.getElementById('surfacesMode1').className = mode === 1 ? 'card' : 'card section-hidden';
+            document.getElementById('surfacesMode2').className = mode === 2 ? 'card' : 'card section-hidden';
+
+            // 發送 maskId 到 ObjectTracker
+            ws.send(JSON.stringify({
+                type: 'maskControl',
+                maskId: mode
+            }));
+            console.log(`切換到投影模式 ${mode}，已發送 maskId: ${mode}`);
+
+            // 根據模式開啟對應的 Surfaces，關閉另一組
+            if (mode === 1) {
+                // 開啟 Quad-1~8，關閉 Quad-9~16
+                for (let i = 1; i <= 8; i++) {
+                    toggleSurface(i, true, false); // false = 不發送 maskId
+                }
+                for (let i = 9; i <= 16; i++) {
+                    toggleSurface(i, false, false);
+                }
+            } else {
+                // 開啟 Quad-9~16，關閉 Quad-1~8
+                for (let i = 1; i <= 8; i++) {
+                    toggleSurface(i, false, false);
+                }
+                for (let i = 9; i <= 16; i++) {
+                    toggleSurface(i, true, false);
+                }
+            }
+        }
+
+        // 單一 Surface 切換
+        function toggleSingleSurface(quadNum, mode) {
+            const surfaceDiv = document.getElementById(`surface${quadNum}`);
+            const isActive = surfaceDiv.classList.contains('active');
+            const newState = !isActive;
+            toggleSurface(quadNum, newState, false);
+        }
+
+        // 切換 Surface 狀態
+        function toggleSurface(quadNum, enabled, sendMaskId = false) {
+            const surfaceName = `Quad-${quadNum}`;
+            const surfaceDiv = document.getElementById(`surface${quadNum}`);
+            const statusDiv = document.getElementById(`status${quadNum}`);
+
+            // 更新 UI
+            if (enabled) {
+                surfaceDiv.classList.add('active');
+                statusDiv.textContent = '開啟';
+            } else {
+                surfaceDiv.classList.remove('active');
+                statusDiv.textContent = '關閉';
+            }
+
+            // 更新狀態
+            const modeKey = quadNum <= 8 ? 1 : 2;
+            surfaceStates[modeKey][quadNum] = enabled;
+
+            // 發送 OSC 到 MadMapper
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'madmapperControl',
+                    surface: surfaceName,
+                    enabled: enabled
+                }));
+                console.log(`${surfaceName}: ${enabled ? '開啟' : '關閉'}`);
+            }
+        }
+
+        // 應用完整系統狀態（從伺服器載入）
+        function applySystemState(state) {
+            console.log('應用系統狀態...');
+            
+            // 應用內容模式
+            if (state.contentMode) {
+                updateContentMode(state.contentMode);
+            }
+            
+            // 應用投影模式（不發送 OSC，只更新 UI）
+            if (state.maskMode) {
+                currentMaskMode = state.maskMode;
+                document.getElementById('currentMaskMode').textContent = `模式 ${state.maskMode}`;
+                
+                // 更新模式按鈕樣式
+                document.getElementById('mask1').className = state.maskMode === 1 ? 
+                    'btn btn-primary mask-mode-btn w-100 active' : 
+                    'btn btn-outline-primary mask-mode-btn w-100';
+                document.getElementById('mask2').className = state.maskMode === 2 ? 
+                    'btn btn-primary mask-mode-btn w-100 active' : 
+                    'btn btn-outline-primary mask-mode-btn w-100';
+                
+                // 切換 Surface 控制區域顯示
+                document.getElementById('surfacesMode1').className = state.maskMode === 1 ? 'card' : 'card section-hidden';
+                document.getElementById('surfacesMode2').className = state.maskMode === 2 ? 'card' : 'card section-hidden';
+            }
+            
+            // 應用 Surface 狀態（不發送 OSC，只更新 UI）
+            if (state.surfaceStates) {
+                Object.keys(state.surfaceStates).forEach(surfaceName => {
+                    const quadNum = parseInt(surfaceName.split('-')[1]);
+                    const enabled = state.surfaceStates[surfaceName];
+                    
+                    const surfaceDiv = document.getElementById(`surface${quadNum}`);
+                    const statusDiv = document.getElementById(`status${quadNum}`);
+                    
+                    if (surfaceDiv && statusDiv) {
+                        if (enabled) {
+                            surfaceDiv.classList.add('active');
+                            statusDiv.textContent = '開啟';
+                        } else {
+                            surfaceDiv.classList.remove('active');
+                            statusDiv.textContent = '關閉';
+                        }
+                        
+                        // 更新本地狀態追蹤
+                        const modeKey = quadNum <= 8 ? 1 : 2;
+                        surfaceStates[modeKey][quadNum] = enabled;
+                    }
+                });
+            }
+            
+            console.log('系統狀態已應用');
+            console.log(`- 內容模式: ${state.contentMode}`);
+            console.log(`- 投影模式: ${state.maskMode}`);
+            const activeSurfaces = Object.values(state.surfaceStates || {}).filter(s => s).length;
+            console.log(`- 開啟的 Surface: ${activeSurfaces}/16`);
+        }
+
+        // 批次切換當前模式的所有 Surfaces
+        function toggleAllSurfacesInMode(mode, enabled) {
+            if (mode === 1) {
+                for (let i = 1; i <= 8; i++) {
+                    toggleSurface(i, enabled, false);
+                }
+            } else {
+                for (let i = 9; i <= 16; i++) {
+                    toggleSurface(i, enabled, false);
                 }
             }
         }
@@ -387,63 +569,10 @@
             document.getElementById('lastUpdate').textContent = timeStr;
         }
 
-        // MadMapper OSC 控制
-        function toggleSurface(surfaceName, enabled) {
-            if (ws && ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({
-                    type: 'oscControl',
-                    surface: surfaceName,
-                    enabled: enabled
-                }));
-                console.log(`OSC: ${surfaceName} ${enabled ? '開啟' : '關閉'}`);
-            } else {
-                alert('未連接到伺服器！');
-                // 還原開關狀態
-                document.getElementById(surfaceName).checked = !enabled;
-            }
-        }
-
-        function toggleAllSurfaces(enabled) {
-            const surfaces = ['Quad-1', 'Quad-2', 'Quad-3', 'Mask-1'];
-            surfaces.forEach(surfaceId => {
-                const checkbox = document.getElementById(surfaceId);
-                if (checkbox.checked !== enabled) {
-                    checkbox.checked = enabled;
-                    toggleSurface(surfaceId, enabled);
-                }
-            });
-        }
-
-        function saveOSCSettings() {
-            const madmapperIp = document.getElementById('madmapperIp').value;
-            const madmapperPort = parseInt(document.getElementById('madmapperPort').value);
-
-            if (ws && ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({
-                    type: 'updateOSCConfig',
-                    config: {
-                        madmapperIp: madmapperIp,
-                        madmapperPort: madmapperPort
-                    }
-                }));
-            } else {
-                alert('未連接到伺服器！');
-            }
-        }
-
-        // 載入 OSC 設定
-        function loadOSCSettings() {
-            if (ws && ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({
-                    type: 'getOSCConfig'
-                }));
-            }
-        }
-
-        // 頁面載入時連接
+        // 初始化
         document.getElementById('serverUrl').textContent = serverUrl;
+        initSurfaceGrids();
         connect();
-        loadOSCSettings();
     </script>
 </body>
 </html>
