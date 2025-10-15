@@ -148,25 +148,37 @@
                     <div class="col-4">
                         <button class="btn btn-outline-secondary mode-btn w-100" onclick="switchContentMode(1)" id="content1">
                             <i class="bi bi-1-circle"></i>
-                            <div>內容 1</div>
+                            <div>Flow Light</div>
                         </button>
                     </div>
                     <div class="col-4">
                         <button class="btn btn-outline-secondary mode-btn w-100" onclick="switchContentMode(2)" id="content2">
                             <i class="bi bi-2-circle"></i>
-                            <div>內容 2</div>
+                            <div>Ocean</div>
                         </button>
                     </div>
                     <div class="col-4">
                         <button class="btn btn-outline-secondary mode-btn w-100" onclick="switchContentMode(3)" id="content3">
                             <i class="bi bi-3-circle"></i>
-                            <div>內容 3</div>
+                            <div>Forest</div>
                         </button>
                     </div>
                     <div class="col-4">
                         <button class="btn btn-outline-secondary mode-btn w-100" onclick="switchContentMode(4)" id="content4">
                             <i class="bi bi-4-circle"></i>
-                            <div>內容 4</div>
+                            <div>Crops</div>
+                        </button>
+                    </div>
+                    <div class="col-4">
+                        <button class="btn btn-outline-secondary mode-btn w-100" onclick="switchContentMode(5)" id="content5">
+                            <i class="bi bi-5-circle"></i>
+                            <div>Mountain Lake</div>
+                        </button>
+                    </div>
+                    <div class="col-4">
+                        <button class="btn btn-outline-secondary mode-btn w-100" onclick="switchContentMode(0)" id="content0">
+                            <i class="bi bi-0-circle"></i>
+                            <div>內容 0</div>
                         </button>
                     </div>
                 </div>
@@ -404,7 +416,7 @@
             document.getElementById('currentContentMode').textContent = `內容 ${mode}`;
             
             // 更新按鈕樣式
-            for (let i = 1; i <= 7; i++) {
+            for (let i = 0; i < 6; i++) {
                 const btn = document.getElementById(`content${i}`);
                 if (btn) {
                     if (i === mode) {
