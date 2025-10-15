@@ -131,7 +131,7 @@
                         <h6 class="mb-0 mt-1" id="currentContentMode">未知</h6>
                     </div>
                     <div class="col-6">
-                        <small class="text-muted">投影模式</small>
+                        <small class="text-muted">桌面模式</small>
                         <h6 class="mb-0 mt-1" id="currentMaskMode">未知</h6>
                     </div>
                 </div>
@@ -169,33 +169,15 @@
                             <div>內容 4</div>
                         </button>
                     </div>
-                    <div class="col-4">
-                        <button class="btn btn-outline-secondary mode-btn w-100" onclick="switchContentMode(5)" id="content5">
-                            <i class="bi bi-5-circle"></i>
-                            <div>內容 5</div>
-                        </button>
-                    </div>
-                    <div class="col-4">
-                        <button class="btn btn-outline-secondary mode-btn w-100" onclick="switchContentMode(6)" id="content6">
-                            <i class="bi bi-6-circle"></i>
-                            <div>內容 6</div>
-                        </button>
-                    </div>
-                    <div class="col-4">
-                        <button class="btn btn-outline-secondary mode-btn w-100" onclick="switchContentMode(7)" id="content7">
-                            <i class="bi bi-7-circle"></i>
-                            <div>內容 7</div>
-                        </button>
-                    </div>
                 </div>
             </div>
         </div>
 
-        <!-- 投影模式切換 -->
+        <!-- 桌面模式切換 -->
         <div class="card">
             <div class="card-body">
                 <h6 class="card-subtitle mb-3 text-muted">
-                    <i class="bi bi-projector"></i> 投影模式
+                    <i class="bi bi-projector"></i> 桌面模式
                 </h6>
                 <div class="row g-3">
                     <div class="col-6">
@@ -221,7 +203,7 @@
                     <i class="bi bi-grid"></i> Surface 控制 - 模式一
                 </h6>
                 <div class="surface-grid" id="surfaceGridMode1">
-                    <!-- Quad 1-8 將由 JS 動態生成 -->
+                    <!-- 由 JS 動態生成 -->
                 </div>
                 <div class="mt-3">
                     <button class="btn btn-sm btn-outline-primary w-100" onclick="toggleAllSurfacesInMode(1, true)">
@@ -243,7 +225,7 @@
                     <i class="bi bi-grid"></i> Surface 控制 - 模式二
                 </h6>
                 <div class="surface-grid" id="surfaceGridMode2">
-                    <!-- Quad 9-16 將由 JS 動態生成 -->
+                    <!-- 由 JS 動態生成 -->
                 </div>
                 <div class="mt-3">
                     <button class="btn btn-sm btn-outline-primary w-100" onclick="toggleAllSurfacesInMode(2, true)">
@@ -267,11 +249,11 @@
                 <div class="info-text">
                     <div class="mb-2">
                         <i class="bi bi-hdd-network"></i>
-                        伺服器：<span id="serverUrl" class="text-dark">ws://localhost:3000</span>
+                        伺服器:<span id="serverUrl" class="text-dark">ws://localhost:3000</span>
                     </div>
                     <div>
                         <i class="bi bi-clock"></i>
-                        最後更新：<span id="lastUpdate" class="text-dark">--</span>
+                        最後更新:<span id="lastUpdate" class="text-dark">--</span>
                     </div>
                 </div>
             </div>
@@ -284,36 +266,56 @@
         let ws;
         let currentContentMode = 0;
         let currentMaskMode = 1; // 預設模式一
-        const serverUrl = 'ws://192.168.0.199:3000';
+        const serverUrl = 'ws://192.168.0.201:3000';
 
-        // Surface 狀態追蹤
-        const surfaceStates = {
-            1: {}, // 模式一的 Quad-1~8
-            2: {}  // 模式二的 Quad-9~16
+        // Surface 名字設定（與後端保持一致）
+        const surfacesSettings = {
+            1: [
+                { SurfaceName: 'Main-1', ShowName: 'Main' },
+                { SurfaceName: 'T1-1', ShowName: 'T1' },
+                { SurfaceName: 'T2-1', ShowName: 'T2' },
+                { SurfaceName: 'T3-1', ShowName: 'T3' },
+                { SurfaceName: 'T4-1', ShowName: 'T4' },
+                { SurfaceName: 'T5-1', ShowName: 'T5' },
+                { SurfaceName: 'T6-1', ShowName: 'T6' },
+                { SurfaceName: 'T7-1', ShowName: 'T7' }
+            ],
+            2: [
+                { SurfaceName: 'Main-2', ShowName: 'Main' },
+                { SurfaceName: 'T2-2', ShowName: 'T2' },
+                { SurfaceName: 'T3-2', ShowName: 'T3' },
+                { SurfaceName: 'T4-2', ShowName: 'T4' },
+                { SurfaceName: 'T5-2', ShowName: 'T5' },
+                { SurfaceName: 'T6-2', ShowName: 'T6' },
+                { SurfaceName: 'T7-2', ShowName: 'T7' }
+            ]
         };
+
+        // Surface 狀態追蹤 - 使用 Surface 名稱作為 key
+        const surfaceStates = {};
 
         // 初始化 Surface 控制介面
         function initSurfaceGrids() {
-            // 模式一：Quad-1 ~ Quad-8
+            // 模式一
             const grid1 = document.getElementById('surfaceGridMode1');
-            for (let i = 1; i <= 8; i++) {
-                surfaceStates[1][i] = false;
-                grid1.innerHTML += createSurfaceToggle(i, 1);
-            }
+            surfacesSettings[1].forEach(surface => {
+                surfaceStates[surface.SurfaceName] = false;
+                grid1.innerHTML += createSurfaceToggle(surface.SurfaceName, surface.ShowName);
+            });
 
-            // 模式二：Quad-9 ~ Quad-16
+            // 模式二
             const grid2 = document.getElementById('surfaceGridMode2');
-            for (let i = 9; i <= 16; i++) {
-                surfaceStates[2][i] = false;
-                grid2.innerHTML += createSurfaceToggle(i, 2);
-            }
+            surfacesSettings[2].forEach(surface => {
+                surfaceStates[surface.SurfaceName] = false;
+                grid2.innerHTML += createSurfaceToggle(surface.SurfaceName, surface.ShowName);
+            });
         }
 
-        function createSurfaceToggle(quadNum, mode) {
+        function createSurfaceToggle(surfaceName, showName) {
             return `
-                <div class="surface-toggle" id="surface${quadNum}" onclick="toggleSingleSurface(${quadNum}, ${mode})">
-                    <div class="surface-name">Quad-${quadNum}</div>
-                    <div class="surface-status" id="status${quadNum}">關閉</div>
+                <div class="surface-toggle" id="surface-${surfaceName}" onclick="toggleSingleSurface('${surfaceName}')">
+                    <div class="surface-name">${showName}</div>
+                    <div class="surface-status" id="status-${surfaceName}">關閉</div>
                 </div>
             `;
         }
@@ -330,7 +332,7 @@
                     userAgent: navigator.userAgent
                 }));
 
-                // 不要強制初始化，等待伺服器發送狀態
+                // 等待伺服器發送狀態
                 console.log('等待伺服器發送系統狀態...');
             };
 
@@ -346,13 +348,23 @@
                     console.log('收到系統狀態:', data.state);
                     applySystemState(data.state);
                 }
+
+                // 接收其他客戶端的 Surface 狀態更新
+                if (data.type === 'madmapperStatusUpdate') {
+                    updateSurfaceUI(data.surface, data.enabled);
+                }
+
+                // 接收其他客戶端的 Mask 狀態更新
+                if (data.type === 'maskStatusUpdate') {
+                    updateMaskModeUI(data.maskId);
+                }
                 
                 updateLastUpdate();
             };
 
             ws.onclose = () => {
                 updateStatus(false);
-                console.log('WebSocket 已斷線，5秒後重連...');
+                console.log('WebSocket 已斷線,5秒後重連...');
                 setTimeout(connect, 5000);
             };
 
@@ -383,7 +395,7 @@
                 }));
                 updateContentMode(mode);
             } else {
-                alert('未連接到伺服器！');
+                alert('未連接到伺服器!');
             }
         }
 
@@ -407,10 +419,43 @@
         // Mask 模式切換
         function switchMaskMode(mode) {
             if (ws && ws.readyState !== WebSocket.OPEN) {
-                alert('未連接到伺服器！');
+                alert('未連接到伺服器!');
                 return;
             }
 
+            currentMaskMode = mode;
+            
+            // 發送 maskId 到 ObjectTracker
+            ws.send(JSON.stringify({
+                type: 'maskControl',
+                maskId: mode
+            }));
+            
+            console.log(`切換到桌面模式 ${mode},已發送 maskId: ${mode}`);
+
+            // 更新 UI
+            updateMaskModeUI(mode);
+
+            // 根據模式開啟對應的 Surfaces,關閉另一組
+            if (mode === 1) {
+                surfacesSettings[1].forEach(surface => {
+                    toggleSurface(surface.SurfaceName, true);
+                });
+                surfacesSettings[2].forEach(surface => {
+                    toggleSurface(surface.SurfaceName, false);
+                });
+            } else {
+                surfacesSettings[1].forEach(surface => {
+                    toggleSurface(surface.SurfaceName, false);
+                });
+                surfacesSettings[2].forEach(surface => {
+                    toggleSurface(surface.SurfaceName, true);
+                });
+            }
+        }
+
+        // 更新 Mask 模式 UI
+        function updateMaskModeUI(mode) {
             currentMaskMode = mode;
             document.getElementById('currentMaskMode').textContent = `模式 ${mode}`;
 
@@ -425,60 +470,23 @@
             // 切換 Surface 控制區域顯示
             document.getElementById('surfacesMode1').className = mode === 1 ? 'card' : 'card section-hidden';
             document.getElementById('surfacesMode2').className = mode === 2 ? 'card' : 'card section-hidden';
-
-            // 發送 maskId 到 ObjectTracker
-            ws.send(JSON.stringify({
-                type: 'maskControl',
-                maskId: mode
-            }));
-            console.log(`切換到投影模式 ${mode}，已發送 maskId: ${mode}`);
-
-            // 根據模式開啟對應的 Surfaces，關閉另一組
-            if (mode === 1) {
-                // 開啟 Quad-1~8，關閉 Quad-9~16
-                for (let i = 1; i <= 8; i++) {
-                    toggleSurface(i, true, false); // false = 不發送 maskId
-                }
-                for (let i = 9; i <= 16; i++) {
-                    toggleSurface(i, false, false);
-                }
-            } else {
-                // 開啟 Quad-9~16，關閉 Quad-1~8
-                for (let i = 1; i <= 8; i++) {
-                    toggleSurface(i, false, false);
-                }
-                for (let i = 9; i <= 16; i++) {
-                    toggleSurface(i, true, false);
-                }
-            }
         }
 
         // 單一 Surface 切換
-        function toggleSingleSurface(quadNum, mode) {
-            const surfaceDiv = document.getElementById(`surface${quadNum}`);
+        function toggleSingleSurface(surfaceName) {
+            const surfaceDiv = document.getElementById(`surface-${surfaceName}`);
             const isActive = surfaceDiv.classList.contains('active');
             const newState = !isActive;
-            toggleSurface(quadNum, newState, false);
+            toggleSurface(surfaceName, newState);
         }
 
         // 切換 Surface 狀態
-        function toggleSurface(quadNum, enabled, sendMaskId = false) {
-            const surfaceName = `Quad-${quadNum}`;
-            const surfaceDiv = document.getElementById(`surface${quadNum}`);
-            const statusDiv = document.getElementById(`status${quadNum}`);
+        function toggleSurface(surfaceName, enabled) {
+            // 更新本地狀態
+            surfaceStates[surfaceName] = enabled;
 
             // 更新 UI
-            if (enabled) {
-                surfaceDiv.classList.add('active');
-                statusDiv.textContent = '開啟';
-            } else {
-                surfaceDiv.classList.remove('active');
-                statusDiv.textContent = '關閉';
-            }
-
-            // 更新狀態
-            const modeKey = quadNum <= 8 ? 1 : 2;
-            surfaceStates[modeKey][quadNum] = enabled;
+            updateSurfaceUI(surfaceName, enabled);
 
             // 發送 OSC 到 MadMapper
             if (ws && ws.readyState === WebSocket.OPEN) {
@@ -487,11 +495,27 @@
                     surface: surfaceName,
                     enabled: enabled
                 }));
-                console.log(`${surfaceName}: ${enabled ? '開啟' : '關閉'}`);
+                // console.log(`${surfaceName}: ${enabled ? '開啟' : '關閉'}`);
             }
         }
 
-        // 應用完整系統狀態（從伺服器載入）
+        // 更新 Surface UI
+        function updateSurfaceUI(surfaceName, enabled) {
+            const surfaceDiv = document.getElementById(`surface-${surfaceName}`);
+            const statusDiv = document.getElementById(`status-${surfaceName}`);
+
+            if (surfaceDiv && statusDiv) {
+                if (enabled) {
+                    surfaceDiv.classList.add('active');
+                    statusDiv.textContent = '開啟';
+                } else {
+                    surfaceDiv.classList.remove('active');
+                    statusDiv.textContent = '關閉';
+                }
+            }
+        }
+
+        // 應用完整系統狀態(從伺服器載入)
         function applySystemState(state) {
             console.log('應用系統狀態...');
             
@@ -500,67 +524,33 @@
                 updateContentMode(state.contentMode);
             }
             
-            // 應用投影模式（不發送 OSC，只更新 UI）
+            // 應用桌面模式(不發送 OSC,只更新 UI)
             if (state.maskMode) {
-                currentMaskMode = state.maskMode;
-                document.getElementById('currentMaskMode').textContent = `模式 ${state.maskMode}`;
-                
-                // 更新模式按鈕樣式
-                document.getElementById('mask1').className = state.maskMode === 1 ? 
-                    'btn btn-primary mask-mode-btn w-100 active' : 
-                    'btn btn-outline-primary mask-mode-btn w-100';
-                document.getElementById('mask2').className = state.maskMode === 2 ? 
-                    'btn btn-primary mask-mode-btn w-100 active' : 
-                    'btn btn-outline-primary mask-mode-btn w-100';
-                
-                // 切換 Surface 控制區域顯示
-                document.getElementById('surfacesMode1').className = state.maskMode === 1 ? 'card' : 'card section-hidden';
-                document.getElementById('surfacesMode2').className = state.maskMode === 2 ? 'card' : 'card section-hidden';
+                updateMaskModeUI(state.maskMode);
             }
             
-            // 應用 Surface 狀態（不發送 OSC，只更新 UI）
+            // 應用 Surface 狀態(不發送 OSC,只更新 UI)
             if (state.surfaceStates) {
                 Object.keys(state.surfaceStates).forEach(surfaceName => {
-                    const quadNum = parseInt(surfaceName.split('-')[1]);
                     const enabled = state.surfaceStates[surfaceName];
-                    
-                    const surfaceDiv = document.getElementById(`surface${quadNum}`);
-                    const statusDiv = document.getElementById(`status${quadNum}`);
-                    
-                    if (surfaceDiv && statusDiv) {
-                        if (enabled) {
-                            surfaceDiv.classList.add('active');
-                            statusDiv.textContent = '開啟';
-                        } else {
-                            surfaceDiv.classList.remove('active');
-                            statusDiv.textContent = '關閉';
-                        }
-                        
-                        // 更新本地狀態追蹤
-                        const modeKey = quadNum <= 8 ? 1 : 2;
-                        surfaceStates[modeKey][quadNum] = enabled;
-                    }
+                    surfaceStates[surfaceName] = enabled;
+                    updateSurfaceUI(surfaceName, enabled);
                 });
             }
             
             console.log('系統狀態已應用');
             console.log(`- 內容模式: ${state.contentMode}`);
-            console.log(`- 投影模式: ${state.maskMode}`);
+            console.log(`- 桌面模式: ${state.maskMode}`);
             const activeSurfaces = Object.values(state.surfaceStates || {}).filter(s => s).length;
-            console.log(`- 開啟的 Surface: ${activeSurfaces}/16`);
+            const totalSurfaces = Object.keys(state.surfaceStates || {}).length;
+            console.log(`- 開啟的 Surface: ${activeSurfaces}/${totalSurfaces}`);
         }
 
         // 批次切換當前模式的所有 Surfaces
         function toggleAllSurfacesInMode(mode, enabled) {
-            if (mode === 1) {
-                for (let i = 1; i <= 8; i++) {
-                    toggleSurface(i, enabled, false);
-                }
-            } else {
-                for (let i = 9; i <= 16; i++) {
-                    toggleSurface(i, enabled, false);
-                }
-            }
+            surfacesSettings[mode].forEach(surface => {
+                toggleSurface(surface.SurfaceName, enabled);
+            });
         }
 
         function updateLastUpdate() {

@@ -11,13 +11,36 @@ const STATE_FILE = 'system_state.json'; // 完整狀態檔案
 
 // OSC 設定
 const OSC_CONFIG = {
-    madmapperIp: '192.168.0.189',      // MadMapper 電腦的 IP
+    madmapperIp: '192.168.0.202',      // MadMapper 電腦的 IP
     madmapperPort: 8010,                // MadMapper OSC 接收端口
     
-    objectTrackerIp: '192.168.0.199',  // Object Tracker 主機 IP
+    objectTrackerIp: '192.168.0.201',  // Object Tracker 主機 IP
     objectTrackerPort: 8000,            // Object Tracker OSC 接收端口
     
     localPort: 9000                     // 本地發送端口
+};
+
+// Surface 設定（與前端保持一致）
+const SURFACES_SETTINGS = {
+    1: [
+        { SurfaceName: 'Main-1', ShowName: 'Main' },
+        { SurfaceName: 'T1-1', ShowName: 'T1' },
+        { SurfaceName: 'T2-1', ShowName: 'T2' },
+        { SurfaceName: 'T3-1', ShowName: 'T3' },
+        { SurfaceName: 'T4-1', ShowName: 'T4' },
+        { SurfaceName: 'T5-1', ShowName: 'T5' },
+        { SurfaceName: 'T6-1', ShowName: 'T6' },
+        { SurfaceName: 'T7-1', ShowName: 'T7' }
+    ],
+    2: [
+        { SurfaceName: 'Main-2', ShowName: 'Main' },
+        { SurfaceName: 'T2-2', ShowName: 'T2' },
+        { SurfaceName: 'T3-2', ShowName: 'T3' },
+        { SurfaceName: 'T4-2', ShowName: 'T4' },
+        { SurfaceName: 'T5-2', ShowName: 'T5' },
+        { SurfaceName: 'T6-2', ShowName: 'T6' },
+        { SurfaceName: 'T7-2', ShowName: 'T7' }
+    ]
 };
 
 // 建立 OSC UDP 端口
@@ -46,9 +69,17 @@ let systemState = {
     surfaceStates: {}    // Surface 開關狀態
 };
 
-// 初始化所有 Surface 狀態為關閉
-for (let i = 1; i <= 16; i++) {
-    systemState.surfaceStates[`Quad-${i}`] = false;
+// 初始化所有 Surface 狀態為關閉（使用實際的 Surface 名稱）
+function initializeSurfaceStates() {
+    // 初始化模式 1 的 Surfaces
+    SURFACES_SETTINGS[1].forEach(surface => {
+        systemState.surfaceStates[surface.SurfaceName] = false;
+    });
+    
+    // 初始化模式 2 的 Surfaces
+    SURFACES_SETTINGS[2].forEach(surface => {
+        systemState.surfaceStates[surface.SurfaceName] = false;
+    });
 }
 
 // 載入系統狀態
@@ -61,21 +92,24 @@ function loadSystemState() {
             // 合併載入的狀態
             if (loaded.contentMode !== undefined) systemState.contentMode = loaded.contentMode;
             if (loaded.maskMode !== undefined) systemState.maskMode = loaded.maskMode;
+            
+            // 正確處理 Surface 狀態
             if (loaded.surfaceStates) {
-                // 確保所有 Surface 都有狀態
-                for (let i = 1; i <= 16; i++) {
-                    const key = `Quad-${i}`;
-                    if (loaded.surfaceStates[key] !== undefined) {
-                        systemState.surfaceStates[key] = loaded.surfaceStates[key];
+                // 遍歷載入的 Surface 狀態
+                Object.keys(loaded.surfaceStates).forEach(surfaceName => {
+                    // 只有在我們的設定中存在的 Surface 才載入
+                    if (systemState.surfaceStates.hasOwnProperty(surfaceName)) {
+                        systemState.surfaceStates[surfaceName] = loaded.surfaceStates[surfaceName];
                     }
-                }
+                });
             }
             
             console.log(`\n📂 已載入系統狀態:`);
             console.log(`   內容模式: ${systemState.contentMode}`);
             console.log(`   投影模式: ${systemState.maskMode}`);
             const activeSurfaces = Object.values(systemState.surfaceStates).filter(s => s).length;
-            console.log(`   開啟的 Surface: ${activeSurfaces}/16`);
+            const totalSurfaces = Object.keys(systemState.surfaceStates).length;
+            console.log(`   開啟的 Surface: ${activeSurfaces}/${totalSurfaces}`);
             return true;
         } catch (error) {
             console.log('⚠️  無法讀取狀態檔案:', error.message);
@@ -116,7 +150,8 @@ console.log('╚═════════════════════�
 console.log(`\n🔌 WebSocket 伺服器: ws://0.0.0.0:${WS_PORT}`);
 console.log(`📝 網頁由 nginx 提供`);
 
-// 載入系統狀態
+// 初始化並載入系統狀態
+initializeSurfaceStates();
 loadSystemState();
 
 wss.on('connection', (ws, req) => {
@@ -168,7 +203,7 @@ wss.on('connection', (ws, req) => {
             if (data.type === 'switchMode') {
                 const oldMode = systemState.contentMode;
                 systemState.contentMode = data.mode;
-                saveSystemState(); // 儲存完整狀態
+                saveSystemState();
                 
                 console.log(`\n🔄 內容模式切換: ${oldMode} → ${systemState.contentMode}`);
                 console.log(`   來源: ${ws.clientInfo.type} (${clientId})`);
@@ -346,7 +381,7 @@ function handleMadmapperControl(data) {
 
 // Mask 控制
 function handleMaskControl(data) {
-    const oscAddress = '/mask';  // 或根據你的需求設定位址
+    const oscAddress = '/mask';
     const maskId = parseInt(data.maskId);
     
     console.log(`\n🎭 Mask 控制:`);
@@ -407,7 +442,8 @@ function printStatus() {
     console.log(`\n📊 連接狀態: 總計 ${clients.size} | Unity ${unityClients.size} | 網頁 ${webClients.size}`);
     console.log(`   內容模式: ${systemState.contentMode} | 投影模式: ${systemState.maskMode}`);
     const activeSurfaces = Object.keys(systemState.surfaceStates).filter(k => systemState.surfaceStates[k]).length;
-    console.log(`   開啟的 Surface: ${activeSurfaces}/16`);
+    const totalSurfaces = Object.keys(systemState.surfaceStates).length;
+    console.log(`   開啟的 Surface: ${activeSurfaces}/${totalSurfaces}`);
 }
 
 // 啟動後顯示資訊

@@ -1,23 +1,22 @@
 {
-  "contentMode": 4,
-  "maskMode": 1,
+  "contentMode": 2,
+  "maskMode": 2,
   "surfaceStates": {
-    "Quad-1": false,
-    "Quad-2": true,
-    "Quad-3": true,
-    "Quad-4": true,
-    "Quad-5": true,
-    "Quad-6": false,
-    "Quad-7": false,
-    "Quad-8": false,
-    "Quad-9": false,
-    "Quad-10": false,
-    "Quad-11": false,
-    "Quad-12": false,
-    "Quad-13": false,
-    "Quad-14": false,
-    "Quad-15": false,
-    "Quad-16": false
+    "Main-1": false,
+    "T1-1": false,
+    "T2-1": false,
+    "T3-1": false,
+    "T4-1": false,
+    "T5-1": false,
+    "T6-1": false,
+    "T7-1": false,
+    "Main-2": true,
+    "T2-2": true,
+    "T3-2": true,
+    "T4-2": true,
+    "T5-2": true,
+    "T6-2": true,
+    "T7-2": true
   },
-  "timestamp": "2025-10-15T04:36:08.111Z"
+  "timestamp": "2025-10-15T13:10:02.749Z"
 }
