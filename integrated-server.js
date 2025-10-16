@@ -4,10 +4,11 @@
 const WebSocket = require('ws');
 const osc = require('osc');
 const fs = require('fs');
+const path = require('path');
 
 // 設定
 const WS_PORT = 3000;
-const STATE_FILE = 'system_state.json'; // 完整狀態檔案
+const STATE_FILE = path.join(__dirname, 'system_state.json'); // 完整狀態檔案
 
 // OSC 設定
 const OSC_CONFIG = {
@@ -69,7 +70,7 @@ let systemState = {
     surfaceStates: {}    // Surface 開關狀態
 };
 
-// 初始化所有 Surface 狀態為關閉（使用實際的 Surface 名稱）
+// 初始化所有 Surface 狀態為開啟（使用實際的 Surface 名稱）
 function initializeSurfaceStates() {
     // 初始化模式 1 的 Surfaces
     SURFACES_SETTINGS[1].forEach(surface => {
@@ -356,11 +357,10 @@ function handleMadmapperControl(data) {
     const oscAddress = `/surfaces/${data.surface}/opacity`;
     const oscValue = data.enabled ? 1.0 : 0.0;
     
-    console.log(`\n🎨 MadMapper 控制:`);
-    console.log(`   Surface: ${data.surface}`);
-    console.log(`   位址: ${oscAddress}`);
-    console.log(`   值: ${oscValue} (${data.enabled ? '開啟' : '關閉'})`);
-    console.log(`   目標: ${OSC_CONFIG.madmapperIp}:${OSC_CONFIG.madmapperPort}`);
+    // console.log(`\n🎨 MadMapper 控制:`);
+    console.log(`   surface: ${data.surface}`);
+    console.log(`   address: ${oscAddress} value: ${oscValue} (${data.enabled ? 'open' : 'close'})`);
+    console.log(`   url: ${OSC_CONFIG.madmapperIp}:${OSC_CONFIG.madmapperPort}`);
     
     try {
         udpPort.send({
@@ -384,10 +384,10 @@ function handleMaskControl(data) {
     const oscAddress = '/mask';
     const maskId = parseInt(data.maskId);
     
-    console.log(`\n🎭 Mask 控制:`);
-    console.log(`   Mask ID: ${maskId}`);
-    console.log(`   位址: ${oscAddress}`);
-    console.log(`   目標: ${OSC_CONFIG.objectTrackerIp}:${OSC_CONFIG.objectTrackerPort}`);
+    // console.log(`\n🎭 Mask 控制:`);
+    console.log(`   mask ID: ${maskId}`);
+    console.log(`   address: ${oscAddress}`);
+    console.log(`   url: ${OSC_CONFIG.objectTrackerIp}:${OSC_CONFIG.objectTrackerPort}`);
     
     try {
         udpPort.send({
