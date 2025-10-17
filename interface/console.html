@@ -146,31 +146,31 @@
                 </h6>
                 <div class="row g-2">
                     <div class="col-4">
-                        <button class="btn btn-outline-secondary mode-btn w-100" onclick="switchContentMode(1)" id="content1">
+                        <button class="btn btn-outline-secondary mode-btn w-100" onclick="switchContentMode(1)" id="content1" name="Flow Light">
                             <i class="bi bi-1-circle"></i>
                             <div>Flow Light</div>
                         </button>
                     </div>
                     <div class="col-4">
-                        <button class="btn btn-outline-secondary mode-btn w-100" onclick="switchContentMode(2)" id="content2">
+                        <button class="btn btn-outline-secondary mode-btn w-100" onclick="switchContentMode(2)" id="content2" name="Ocean">
                             <i class="bi bi-2-circle"></i>
                             <div>Ocean</div>
                         </button>
                     </div>
                     <div class="col-4">
-                        <button class="btn btn-outline-secondary mode-btn w-100" onclick="switchContentMode(3)" id="content3">
+                        <button class="btn btn-outline-secondary mode-btn w-100" onclick="switchContentMode(3)" id="content3" name="Forest">
                             <i class="bi bi-3-circle"></i>
                             <div>Forest</div>
                         </button>
                     </div>
                     <div class="col-4">
-                        <button class="btn btn-outline-secondary mode-btn w-100" onclick="switchContentMode(4)" id="content4">
+                        <button class="btn btn-outline-secondary mode-btn w-100" onclick="switchContentMode(4)" id="content4" name="Crops">
                             <i class="bi bi-4-circle"></i>
                             <div>Crops</div>
                         </button>
                     </div>
                     <div class="col-4">
-                        <button class="btn btn-outline-secondary mode-btn w-100" onclick="switchContentMode(5)" id="content5">
+                        <button class="btn btn-outline-secondary mode-btn w-100" onclick="switchContentMode(5)" id="content5" name="Mountain Lake">
                             <i class="bi bi-5-circle"></i>
                             <div>Mountain Lake</div>
                         </button>
@@ -186,15 +186,15 @@
                 </h6>
                 <div class="row g-2">
                     <div class="col-4">
-                        <button class="btn btn-outline-secondary mode-btn w-100" onclick="switchContentMode(0)" id="content0">
-                            <i class="bi bi-bounding-box-circles"></i>
-                            <div>校正畫面</div>
+                        <button class="btn btn-outline-secondary mode-btn w-100" onclick="switchContentMode(6)" id="content6" name="全白畫面">
+                            <i class="bi bi-brightness-high"></i>
+                            <div>全白畫面</div>
                         </button>
                     </div>
                     <div class="col-4">
-                        <button class="btn btn-outline-secondary mode-btn w-100" onclick="switchContentMode(6)" id="content6">
-                            <i class="bi bi-brightness-high"></i>
-                            <div>全白畫面</div>
+                        <button class="btn btn-outline-secondary mode-btn w-100" onclick="switchContentMode(0)" id="content0" name="校正畫面">
+                            <i class="bi bi-bounding-box-circles"></i>
+                            <div>校正畫面</div>
                         </button>
                     </div>
                 </div>
@@ -429,7 +429,8 @@
 
         function updateContentMode(mode) {
             currentContentMode = mode;
-            document.getElementById('currentContentMode').textContent = `內容 ${mode}`;
+            let name = document.getElementById(`content${mode}`).name;
+            document.getElementById('currentContentMode').textContent = name;
             
             // 更新按鈕樣式
             const btns = document.getElementsByClassName('mode-btn');
