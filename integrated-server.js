@@ -200,6 +200,39 @@ wss.on('connection', (ws, req) => {
                 }
             }
             
+            // Unity 狀態同步 - Unity 連接時發送它的當前狀態來同步整個系統
+            if (data.type === 'unitySync') {
+                console.log(`\n🔄 Unity 狀態同步請求`);
+                console.log(`   來源: ${clientId}`);
+                
+                let stateChanged = false;
+                
+                // 同步內容模式
+                if (data.contentMode !== undefined && data.contentMode !== systemState.contentMode) {
+                    const oldMode = systemState.contentMode;
+                    systemState.contentMode = data.contentMode;
+                    console.log(`   內容模式: ${oldMode} → ${systemState.contentMode}`);
+                    stateChanged = true;
+                }
+                
+                if (stateChanged) {
+                    // 儲存更新的狀態
+                    saveSystemState();
+                    
+                    // 廣播完整系統狀態給所有客戶端（包括 Unity 自己，確保同步）
+                    broadcast({
+                        type: 'systemStateUpdate',
+                        state: systemState,
+                        source: 'unity',
+                        timestamp: Date.now()
+                    });
+                    
+                    console.log(`   ✅ 系統狀態已同步並廣播給所有客戶端`);
+                } else {
+                    console.log(`   ℹ️  狀態已是最新，無需更新`);
+                }
+            }
+
             // 模式切換請求
             if (data.type === 'switchMode') {
                 const oldMode = systemState.contentMode;
