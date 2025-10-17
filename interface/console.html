@@ -113,7 +113,7 @@
         <div class="card">
             <div class="card-body text-center">
                 <h3 class="card-title mb-3">
-                    <i class="bi bi-controller"></i> Room Interactive 控制台
+                    <i class="bi bi-display"></i> Room Interactive 控制台
                 </h3>
                 <span class="badge status-badge" id="statusBadge">
                     <i class="bi bi-circle-fill"></i>
@@ -175,10 +175,26 @@
                             <div>Mountain Lake</div>
                         </button>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <h6 class="card-subtitle mb-3 text-muted">
+                    <i class="bi bi-tools"></i> 工作畫面
+                </h6>
+                <div class="row g-2">
                     <div class="col-4">
                         <button class="btn btn-outline-secondary mode-btn w-100" onclick="switchContentMode(0)" id="content0">
-                            <i class="bi bi-0-circle"></i>
-                            <div>內容 0</div>
+                            <i class="bi bi-bounding-box-circles"></i>
+                            <div>校正畫面</div>
+                        </button>
+                    </div>
+                    <div class="col-4">
+                        <button class="btn btn-outline-secondary mode-btn w-100" onclick="switchContentMode(6)" id="content6">
+                            <i class="bi bi-brightness-high"></i>
+                            <div>全白畫面</div>
                         </button>
                     </div>
                 </div>
@@ -416,8 +432,9 @@
             document.getElementById('currentContentMode').textContent = `內容 ${mode}`;
             
             // 更新按鈕樣式
-            for (let i = 0; i < 6; i++) {
-                const btn = document.getElementById(`content${i}`);
+            const btns = document.getElementsByClassName('mode-btn');
+            Array.from(btns).forEach( btn => {
+                let i = parseInt(btn.id.slice(7));
                 if (btn) {
                     if (i === mode) {
                         btn.className = 'btn btn-primary mode-btn w-100 active';
@@ -425,7 +442,7 @@
                         btn.className = 'btn btn-outline-secondary mode-btn w-100';
                     }
                 }
-            }
+            })
         }
 
         // Mask 模式切換
