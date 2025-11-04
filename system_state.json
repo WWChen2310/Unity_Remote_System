@@ -1,5 +1,5 @@
 {
-  "contentMode": 0,
+  "contentMode": 2,
   "maskMode": 1,
   "surfaceStates": {
     "Main-1": true,
@@ -18,5 +18,17 @@
     "T6-2": false,
     "T7-2": false
   },
-  "timestamp": "2025-10-16T03:54:44.334Z"
+  "autoCycle": {
+    "enabled": false,
+    "interval": 1,
+    "modes": [
+      2,
+      3,
+      4,
+      5
+    ],
+    "currentIndex": 0,
+    "remainingSeconds": 0
+  },
+  "timestamp": "2025-11-04T09:32:42.395Z"
 }

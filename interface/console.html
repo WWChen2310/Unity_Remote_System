@@ -106,6 +106,57 @@
         .section-hidden {
             display: none;
         }
+        
+        /* 自動循環相關樣式 */
+        .auto-cycle-status {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+        .auto-cycle-status.active {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+        }
+        .cycle-timer {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #0c5460;
+        }
+        .mode-list-item {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            margin-bottom: 8px;
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            cursor: move;
+        }
+        .mode-list-item:hover {
+            background: #f8f9fa;
+        }
+        .mode-list-item .drag-handle {
+            cursor: grab;
+            margin-right: 10px;
+            color: #6c757d;
+        }
+        .mode-list-item .mode-info {
+            flex: 1;
+        }
+        .mode-list-item .remove-btn {
+            cursor: pointer;
+            color: #dc3545;
+        }
+        .add-mode-section {
+            margin-top: 15px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
     </style>
 </head>
 <body>
@@ -136,6 +187,70 @@
                         <h6 class="mb-0 mt-1" id="currentMaskMode">未知</h6>
                     </div>
                 </div>
+            </div>
+        </div>
+
+        <!-- 自動循環控制 -->
+        <div class="card">
+            <div class="card-body">
+                <h6 class="card-subtitle mb-3 text-muted">
+                    <i class="bi bi-arrow-repeat"></i> 自動循環切換
+                </h6>
+                
+                <!-- 循環狀態 -->
+                <div class="auto-cycle-status" id="autoCycleStatus">
+                    <div>
+                        <small class="text-muted">循環狀態</small>
+                        <div id="cycleStatusText">未啟用</div>
+                    </div>
+                    <div class="cycle-timer" id="cycleTimer">--:--</div>
+                </div>
+
+                <!-- 循環設定 -->
+                <div class="row g-3 mb-3">
+                    <div class="col-6">
+                        <label for="cycleInterval" class="form-label">循環時間（分鐘）</label>
+                        <input type="number" class="form-control" id="cycleInterval" min="1" max="120" value="10">
+                    </div>
+                    <div class="col-6 d-flex align-items-end">
+                        <button class="btn btn-primary w-100" onclick="toggleAutoCycle()">
+                            <i class="bi bi-play-circle"></i> <span id="toggleCycleText">啟用循環</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 循環模式列表 -->
+                <div>
+                    <label class="form-label">循環模式列表</label>
+                    <div id="cycleModesContainer" class="mb-3">
+                        <!-- 動態生成的模式列表 -->
+                    </div>
+                    
+                    <!-- 新增模式 -->
+                    <div class="add-mode-section">
+                        <div class="row g-2">
+                            <div class="col-8">
+                                <select class="form-select" id="newModeSelect">
+                                    <option value="1">入場 (ID: 1)</option>
+                                    <option value="2">海洋 (ID: 2)</option>
+                                    <option value="3">森林 (ID: 3)</option>
+                                    <option value="4">稻田 (ID: 4)</option>
+                                    <option value="5">水草 (ID: 5)</option>
+                                    <!-- <option value="7">萬聖節 (ID: 7)</option> -->
+                                </select>
+                            </div>
+                            <div class="col-4">
+                                <button class="btn btn-success w-100" onclick="addModeToList()">
+                                    <i class="bi bi-plus-circle"></i> 新增
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <small class="text-muted">
+                    <i class="bi bi-info-circle"></i> 可拖曳模式調整順序，手動切換或修改設定將重新開始計時
+                </small>
             </div>
         </div>
 
@@ -295,18 +410,42 @@
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
-        let ws;
-        let currentContentMode = 0;
-        let currentMaskMode = 1; // 預設模式一
-        const serverUrl = 'ws://192.168.0.201:3000';
+        // 配置
+        const serverUrl = '192.168.0.201';
+        const wsUrl = `ws://${serverUrl}:3000`;
+        
+        let ws = null;
+        let currentContentMode = 1;
+        let currentMaskMode = 1;
+        let surfaceStates = {};
+        
+        // 自動循環相關變數
+        let autoCycleEnabled = false;
+        let cycleModes = [1, 2, 3, 4, 5]; // 預設循環模式
+        let cycleInterval = 10; // 分鐘
+        let cycleTimerInterval = null;
+        let remainingSeconds = 0;
 
-        // Surface 名字設定（與後端保持一致）
+        // 模式名稱對照
+        const modeNames = {
+            0: '校正畫面',
+            1: '入場',
+            2: '海洋',
+            3: '森林',
+            4: '稻田',
+            5: '水草',
+            6: '全白畫面',
+            7: '萬聖節'
+        };
+
+        // Surface 設定（與伺服器保持一致）
         const surfacesSettings = {
             1: [
-                { SurfaceName: 'Main-1', ShowName: '大桌' },
+                { SurfaceName: 'Main-1', ShowName: 'Main' },
                 { SurfaceName: 'T1-1', ShowName: 'T1' },
                 { SurfaceName: 'T2-1', ShowName: 'T2' },
                 { SurfaceName: 'T3-1', ShowName: 'T3' },
@@ -316,7 +455,7 @@
                 { SurfaceName: 'T7-1', ShowName: 'T7' }
             ],
             2: [
-                { SurfaceName: 'Main-2', ShowName: '大桌' },
+                { SurfaceName: 'Main-2', ShowName: 'Main' },
                 { SurfaceName: 'T2-2', ShowName: 'T2' },
                 { SurfaceName: 'T3-2', ShowName: 'T3' },
                 { SurfaceName: 'T4-2', ShowName: 'T4' },
@@ -326,72 +465,86 @@
             ]
         };
 
-        // Surface 狀態追蹤 - 使用 Surface 名稱作為 key
-        const surfaceStates = {};
-
-        // 初始化 Surface 控制介面
+        // 初始化 Surface 網格
         function initSurfaceGrids() {
-            // 模式一
+            // 模式 1
             const grid1 = document.getElementById('surfaceGridMode1');
             surfacesSettings[1].forEach(surface => {
+                const div = createSurfaceToggle(surface);
+                grid1.appendChild(div);
                 surfaceStates[surface.SurfaceName] = false;
-                grid1.innerHTML += createSurfaceToggle(surface.SurfaceName, surface.ShowName);
             });
 
-            // 模式二
+            // 模式 2
             const grid2 = document.getElementById('surfaceGridMode2');
             surfacesSettings[2].forEach(surface => {
+                const div = createSurfaceToggle(surface);
+                grid2.appendChild(div);
                 surfaceStates[surface.SurfaceName] = false;
-                grid2.innerHTML += createSurfaceToggle(surface.SurfaceName, surface.ShowName);
             });
         }
 
-        function createSurfaceToggle(surfaceName, showName) {
-            return `
-                <div class="surface-toggle" id="surface-${surfaceName}" onclick="toggleSingleSurface('${surfaceName}')">
-                    <div class="surface-name">${showName}</div>
-                    <div class="surface-status" id="status-${surfaceName}">關閉</div>
-                </div>
+        // 建立 Surface 切換元件
+        function createSurfaceToggle(surface) {
+            const div = document.createElement('div');
+            div.className = 'surface-toggle';
+            div.id = `surface-${surface.SurfaceName}`;
+            div.onclick = () => toggleSingleSurface(surface.SurfaceName);
+            
+            div.innerHTML = `
+                <div class="surface-name">${surface.ShowName}</div>
+                <div class="surface-status" id="status-${surface.SurfaceName}">關閉</div>
             `;
+            
+            return div;
         }
 
+        // WebSocket 連接
         function connect() {
-            ws = new WebSocket(serverUrl);
+            ws = new WebSocket(wsUrl);
             
             ws.onopen = () => {
-                updateStatus(true);
                 console.log('WebSocket 已連接');
+                updateStatus(true);
                 
+                // 告知伺服器這是網頁客戶端
                 ws.send(JSON.stringify({
-                    clientType: 'web',
-                    userAgent: navigator.userAgent
+                    clientType: 'web'
                 }));
-
-                // 等待伺服器發送狀態
-                console.log('等待伺服器發送系統狀態...');
             };
 
             ws.onmessage = (event) => {
                 const data = JSON.parse(event.data);
                 
-                if (data.type === 'modeUpdate') {
-                    updateContentMode(data.mode);
-                }
-                
                 // 接收完整系統狀態
                 if (data.type === 'systemStateUpdate') {
-                    console.log('收到系統狀態:', data.state);
                     applySystemState(data.state);
                 }
 
-                // 接收其他客戶端的 Surface 狀態更新
+                // 接收模式更新
+                if (data.type === 'modeUpdate') {
+                    updateContentMode(data.mode);
+                }
+
+                // 接收其他客戶端的模式更新
+                if (data.type === 'modeStatusUpdate') {
+                    updateContentMode(data.mode);
+                }
+
+                // 接收 MadMapper 狀態更新
                 if (data.type === 'madmapperStatusUpdate') {
+                    surfaceStates[data.surface] = data.enabled;
                     updateSurfaceUI(data.surface, data.enabled);
                 }
 
                 // 接收其他客戶端的 Mask 狀態更新
                 if (data.type === 'maskStatusUpdate') {
                     updateMaskModeUI(data.maskId);
+                }
+
+                // 接收自動循環狀態更新
+                if (data.type === 'autoCycleUpdate') {
+                    updateAutoCycleState(data);
                 }
                 
                 updateLastUpdate();
@@ -426,7 +579,8 @@
             if (ws && ws.readyState === WebSocket.OPEN) {
                 ws.send(JSON.stringify({
                     type: 'switchMode',
-                    mode: mode
+                    mode: mode,
+                    manual: true // 標記為手動切換
                 }));
                 updateContentMode(mode);
             } else {
@@ -532,7 +686,6 @@
                     surface: surfaceName,
                     enabled: enabled
                 }));
-                // console.log(`${surfaceName}: ${enabled ? '開啟' : '關閉'}`);
             }
         }
 
@@ -554,8 +707,6 @@
 
         // 應用完整系統狀態(從伺服器載入)
         function applySystemState(state) {
-            // console.log('應用系統狀態...');
-            
             // 應用內容模式
             if (state.contentMode) {
                 updateContentMode(state.contentMode);
@@ -574,13 +725,26 @@
                     updateSurfaceUI(surfaceName, enabled);
                 });
             }
+
+            // 應用自動循環設定
+            if (state.autoCycle) {
+                cycleModes = state.autoCycle.modes || [1, 2, 3, 4, 5];
+                cycleInterval = state.autoCycle.interval || 10;
+                document.getElementById('cycleInterval').value = cycleInterval;
+                renderCycleModesList();
+                
+                // 如果伺服器端有啟用自動循環
+                if (state.autoCycle.enabled) {
+                    updateAutoCycleState({
+                        enabled: true,
+                        remainingSeconds: state.autoCycle.remainingSeconds || 0
+                    });
+                }
+            }
             
             console.log('系統狀態已應用');
             console.log(`- 內容模式: ${state.contentMode}`);
             console.log(`- 桌面模式: ${state.maskMode}`);
-            // const activeSurfaces = Object.values(state.surfaceStates || {}).filter(s => s).length;
-            // const totalSurfaces = Object.keys(state.surfaceStates || {}).length;
-            // console.log(`- 開啟的 Surface: ${activeSurfaces}/${totalSurfaces}`);
         }
 
         // 批次切換當前模式的所有 Surfaces
@@ -596,9 +760,178 @@
             document.getElementById('lastUpdate').textContent = timeStr;
         }
 
+        // ===== 自動循環功能 =====
+
+        // 啟用/停用自動循環
+        function toggleAutoCycle() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                alert('未連接到伺服器!');
+                return;
+            }
+
+            if (cycleModes.length === 0) {
+                alert('請至少新增一個循環模式！');
+                return;
+            }
+
+            autoCycleEnabled = !autoCycleEnabled;
+            cycleInterval = parseInt(document.getElementById('cycleInterval').value);
+
+            // 發送到伺服器
+            ws.send(JSON.stringify({
+                type: 'autoCycleControl',
+                enabled: autoCycleEnabled,
+                interval: cycleInterval,
+                modes: cycleModes
+            }));
+
+            updateAutoCycleUI();
+        }
+
+        // 更新自動循環狀態（來自伺服器）
+        function updateAutoCycleState(data) {
+            autoCycleEnabled = data.enabled;
+            
+            if (data.remainingSeconds !== undefined) {
+                remainingSeconds = data.remainingSeconds;
+            }
+
+            updateAutoCycleUI();
+        }
+
+        // 更新自動循環 UI
+        function updateAutoCycleUI() {
+            const statusDiv = document.getElementById('autoCycleStatus');
+            const statusText = document.getElementById('cycleStatusText');
+            const toggleBtn = document.getElementById('toggleCycleText');
+            const timerDiv = document.getElementById('cycleTimer');
+
+            if (autoCycleEnabled) {
+                statusDiv.classList.add('active');
+                statusText.innerHTML = '<i class="bi bi-play-circle-fill"></i> 循環中';
+                toggleBtn.innerHTML = '<i class="bi bi-stop-circle"></i> 停止循環';
+                
+                // 啟動計時器顯示
+                if (cycleTimerInterval) clearInterval(cycleTimerInterval);
+                cycleTimerInterval = setInterval(updateTimerDisplay, 1000);
+                updateTimerDisplay();
+            } else {
+                statusDiv.classList.remove('active');
+                statusText.innerHTML = '<i class="bi bi-pause-circle"></i> 未啟用';
+                toggleBtn.innerHTML = '<i class="bi bi-play-circle"></i> 啟用循環';
+                timerDiv.textContent = '--:--';
+                
+                if (cycleTimerInterval) {
+                    clearInterval(cycleTimerInterval);
+                    cycleTimerInterval = null;
+                }
+            }
+        }
+
+        // 更新計時器顯示
+        function updateTimerDisplay() {
+            if (remainingSeconds > 0) {
+                remainingSeconds--;
+                const minutes = Math.floor(remainingSeconds / 60);
+                const seconds = remainingSeconds % 60;
+                document.getElementById('cycleTimer').textContent = 
+                    `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+            }
+        }
+
+        // 渲染循環模式列表
+        function renderCycleModesList() {
+            const container = document.getElementById('cycleModesContainer');
+            container.innerHTML = '';
+
+            if (cycleModes.length === 0) {
+                container.innerHTML = '<div class="text-muted text-center py-3">尚未新增任何循環模式</div>';
+                return;
+            }
+
+            cycleModes.forEach((modeId, index) => {
+                const item = document.createElement('div');
+                item.className = 'mode-list-item';
+                item.dataset.modeId = modeId;
+                item.innerHTML = `
+                    <span class="drag-handle">
+                        <i class="bi bi-grip-vertical"></i>
+                    </span>
+                    <div class="mode-info">
+                        <strong>${index + 1}.</strong> ${modeNames[modeId]} (ID: ${modeId})
+                    </div>
+                    <span class="remove-btn" onclick="removeModeFromList(${modeId})">
+                        <i class="bi bi-trash"></i>
+                    </span>
+                `;
+                container.appendChild(item);
+            });
+
+            // 初始化拖曳排序
+            new Sortable(container, {
+                animation: 150,
+                handle: '.drag-handle',
+                onEnd: function(evt) {
+                    updateCycleModesOrder();
+                }
+            });
+        }
+
+        // 更新循環模式順序
+        function updateCycleModesOrder() {
+            const container = document.getElementById('cycleModesContainer');
+            const items = container.querySelectorAll('.mode-list-item');
+            const newOrder = Array.from(items).map(item => parseInt(item.dataset.modeId));
+            
+            cycleModes = newOrder;
+            saveCycleSettings();
+            renderCycleModesList();
+        }
+
+        // 新增模式到列表
+        function addModeToList() {
+            const select = document.getElementById('newModeSelect');
+            const modeId = parseInt(select.value);
+
+            if (cycleModes.includes(modeId)) {
+                alert('此模式已在列表中！');
+                return;
+            }
+
+            cycleModes.push(modeId);
+            saveCycleSettings();
+            renderCycleModesList();
+        }
+
+        // 從列表移除模式
+        function removeModeFromList(modeId) {
+            cycleModes = cycleModes.filter(id => id !== modeId);
+            saveCycleSettings();
+            renderCycleModesList();
+        }
+
+        // 儲存循環設定到伺服器
+        function saveCycleSettings() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) return;
+
+            const interval = parseInt(document.getElementById('cycleInterval').value);
+            
+            ws.send(JSON.stringify({
+                type: 'updateCycleSettings',
+                interval: interval,
+                modes: cycleModes
+            }));
+        }
+
+        // 監聽循環時間輸入變更
+        document.getElementById('cycleInterval').addEventListener('change', function() {
+            saveCycleSettings();
+        });
+
         // 初始化
         document.getElementById('serverUrl').textContent = serverUrl;
         initSurfaceGrids();
+        renderCycleModesList();
         connect();
     </script>
 </body>

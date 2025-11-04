@@ -67,8 +67,19 @@ udpPort.on('error', (error) => {
 let systemState = {
     contentMode: 1,      // 內容模式
     maskMode: 1,         // 投影模式
-    surfaceStates: {}    // Surface 開關狀態
+    surfaceStates: {},   // Surface 開關狀態
+    autoCycle: {         // 自動循環設定
+        enabled: false,
+        interval: 10,    // 分鐘
+        modes: [1, 2, 3, 4, 5],
+        currentIndex: 0,
+        remainingSeconds: 0
+    }
 };
+
+// 自動循環計時器
+let autoCycleTimer = null;
+let autoCycleIntervalId = null;
 
 // 初始化所有 Surface 狀態為開啟（使用實際的 Surface 名稱）
 function initializeSurfaceStates() {
@@ -104,6 +115,17 @@ function loadSystemState() {
                     }
                 });
             }
+
+            // 載入自動循環設定
+            if (loaded.autoCycle) {
+                systemState.autoCycle = {
+                    enabled: false, // 重啟後預設不啟用
+                    interval: loaded.autoCycle.interval || 10,
+                    modes: loaded.autoCycle.modes || [1, 2, 3, 4, 5],
+                    currentIndex: loaded.autoCycle.currentIndex || 0,
+                    remainingSeconds: 0
+                };
+            }
             
             console.log(`\n📂 已載入系統狀態:`);
             console.log(`   內容模式: ${systemState.contentMode}`);
@@ -111,6 +133,8 @@ function loadSystemState() {
             const activeSurfaces = Object.values(systemState.surfaceStates).filter(s => s).length;
             const totalSurfaces = Object.keys(systemState.surfaceStates).length;
             console.log(`   開啟的 Surface: ${activeSurfaces}/${totalSurfaces}`);
+            console.log(`   自動循環模式: ${systemState.autoCycle.modes.join(', ')}`);
+            console.log(`   循環間隔: ${systemState.autoCycle.interval} 分鐘`);
             return true;
         } catch (error) {
             console.log('⚠️  無法讀取狀態檔案:', error.message);
@@ -130,6 +154,7 @@ function saveSystemState() {
             contentMode: systemState.contentMode,
             maskMode: systemState.maskMode,
             surfaceStates: systemState.surfaceStates,
+            autoCycle: systemState.autoCycle,
             timestamp: new Date().toISOString()
         };
         fs.writeFileSync(STATE_FILE, JSON.stringify(stateData, null, 2));
@@ -155,6 +180,143 @@ console.log(`📝 網頁由 nginx 提供`);
 initializeSurfaceStates();
 loadSystemState();
 
+// ===== 自動循環功能 =====
+
+// 啟動自動循環
+function startAutoCycle() {
+    stopAutoCycle(); // 先停止現有的計時器
+
+    if (systemState.autoCycle.modes.length === 0) {
+        console.log('⚠️  自動循環模式列表為空，無法啟動');
+        return;
+    }
+
+    systemState.autoCycle.enabled = true;
+    systemState.autoCycle.remainingSeconds = systemState.autoCycle.interval * 60;
+    
+    console.log(`\n🔄 自動循環已啟動`);
+    console.log(`   循環間隔: ${systemState.autoCycle.interval} 分鐘`);
+    console.log(`   循環模式: ${systemState.autoCycle.modes.join(', ')}`);
+    console.log(`   當前索引: ${systemState.autoCycle.currentIndex}`);
+
+    // 每秒更新剩餘時間並廣播給客戶端
+    autoCycleIntervalId = setInterval(() => {
+        if (systemState.autoCycle.remainingSeconds > 0) {
+            systemState.autoCycle.remainingSeconds--;
+            
+            // 每10秒廣播一次狀態更新
+            if (systemState.autoCycle.remainingSeconds % 10 === 0) {
+                broadcastAutoCycleStatus();
+            }
+        } else {
+            // 時間到，切換到下一個模式
+            switchToNextCycleMode();
+        }
+    }, 1000);
+
+    saveSystemState();
+    broadcastAutoCycleStatus();
+}
+
+// 停止自動循環
+function stopAutoCycle() {
+    if (autoCycleIntervalId) {
+        clearInterval(autoCycleIntervalId);
+        autoCycleIntervalId = null;
+    }
+    
+    systemState.autoCycle.enabled = false;
+    systemState.autoCycle.remainingSeconds = 0;
+    
+    console.log('\n⏸️  自動循環已停止');
+    
+    saveSystemState();
+    broadcastAutoCycleStatus();
+}
+
+// 重置自動循環計時器（手動切換或設定變更時調用）
+function resetAutoCycleTimer() {
+    if (systemState.autoCycle.enabled) {
+        systemState.autoCycle.remainingSeconds = systemState.autoCycle.interval * 60;
+        console.log(`\n⏱️  自動循環計時器已重置 (${systemState.autoCycle.interval} 分鐘)`);
+        broadcastAutoCycleStatus();
+    }
+}
+
+// 切換到下一個循環模式
+function switchToNextCycleMode() {
+    if (systemState.autoCycle.modes.length === 0) {
+        console.log('⚠️  循環模式列表為空');
+        stopAutoCycle();
+        return;
+    }
+
+    // 如果是手動切換後（索引為-1），從第一項開始；否則移動到下一個模式
+    if (systemState.autoCycle.currentIndex === -1) {
+        systemState.autoCycle.currentIndex = 0;
+        console.log(`\n🔄 手動切換後首次自動循環，從列表第一項開始`);
+    } else {
+        systemState.autoCycle.currentIndex = (systemState.autoCycle.currentIndex + 1) % systemState.autoCycle.modes.length;
+    }
+    
+    const nextMode = systemState.autoCycle.modes[systemState.autoCycle.currentIndex];
+    
+    console.log(`\n🔄 自動循環切換: 模式 ${systemState.contentMode} → ${nextMode}`);
+    console.log(`   當前循環索引: ${systemState.autoCycle.currentIndex}/${systemState.autoCycle.modes.length - 1}`);
+
+    // 切換模式
+    const oldMode = systemState.contentMode;
+    systemState.contentMode = nextMode;
+    saveSystemState();
+
+    // 廣播模式更新
+    broadcast({
+        type: 'modeUpdate',
+        mode: systemState.contentMode,
+        source: 'autoCycle',
+        timestamp: Date.now()
+    });
+
+    broadcast({
+        type: 'modeStatusUpdate',
+        mode: systemState.contentMode,
+        oldMode: oldMode,
+        source: 'autoCycle',
+        timestamp: Date.now()
+    });
+
+    // 發送 OSC 到 Unity
+    unityClients.forEach(client => {
+        if (client.readyState === WebSocket.OPEN) {
+            client.send(JSON.stringify({
+                type: 'modeUpdate',
+                mode: systemState.contentMode,
+                source: 'autoCycle',
+                timestamp: Date.now()
+            }));
+        }
+    });
+
+    // 重置計時器
+    systemState.autoCycle.remainingSeconds = systemState.autoCycle.interval * 60;
+    broadcastAutoCycleStatus();
+}
+
+// 廣播自動循環狀態
+function broadcastAutoCycleStatus() {
+    broadcast({
+        type: 'autoCycleUpdate',
+        enabled: systemState.autoCycle.enabled,
+        interval: systemState.autoCycle.interval,
+        modes: systemState.autoCycle.modes,
+        currentIndex: systemState.autoCycle.currentIndex,
+        remainingSeconds: systemState.autoCycle.remainingSeconds,
+        timestamp: Date.now()
+    });
+}
+
+// ===== WebSocket 連接處理 =====
+
 wss.on('connection', (ws, req) => {
     const clientIp = req.socket.remoteAddress;
     const clientPort = req.socket.remotePort;
@@ -177,7 +339,7 @@ wss.on('connection', (ws, req) => {
         timestamp: Date.now()
     }));
     
-    // 發送完整系統狀態
+    // 發送完整系統狀態（包含自動循環設定）
     ws.send(JSON.stringify({
         type: 'systemStateUpdate',
         state: systemState,
@@ -241,41 +403,88 @@ wss.on('connection', (ws, req) => {
                 
                 console.log(`\n🔄 內容模式切換: ${oldMode} → ${systemState.contentMode}`);
                 console.log(`   來源: ${ws.clientInfo.type} (${clientId})`);
-                console.log(`   時間: ${new Date().toLocaleString('zh-TW')}`);
                 
-                // 廣播給所有客戶端
+                // 如果是手動切換，重置自動循環計時器，並將索引設為-1（下次從第一項開始）
+                if (data.manual && systemState.autoCycle.enabled) {
+                    systemState.autoCycle.currentIndex = -1; // 標記為手動切換，下次從頭開始
+                    resetAutoCycleTimer();
+                    console.log(`   🔄 手動切換，自動循環計時器已重置，下次將從列表第一項開始循環`);
+                }
+                
+                // 廣播給其他客戶端
                 broadcast({
-                    type: 'modeUpdate',
+                    type: 'modeStatusUpdate',
                     mode: systemState.contentMode,
-                    source: ws.clientInfo.type,
+                    oldMode: oldMode,
                     timestamp: Date.now()
+                }, ws);
+                
+                // 發送給所有 Unity 客戶端
+                unityClients.forEach(client => {
+                    if (client.readyState === WebSocket.OPEN) {
+                        client.send(JSON.stringify({
+                            type: 'modeUpdate',
+                            mode: systemState.contentMode,
+                            timestamp: Date.now()
+                        }));
+                    }
                 });
+                
+                console.log(`   ✅ 已更新並廣播`);
             }
-            
-            // 取得當前模式
-            if (data.type === 'getMode') {
-                ws.send(JSON.stringify({
-                    type: 'modeUpdate',
-                    mode: systemState.contentMode,
-                    timestamp: Date.now()
-                }));
+
+            // 自動循環控制
+            if (data.type === 'autoCycleControl') {
+                console.log(`\n🔄 自動循環控制`);
+                console.log(`   啟用狀態: ${data.enabled}`);
+                console.log(`   循環間隔: ${data.interval} 分鐘`);
+                console.log(`   循環模式: ${data.modes.join(', ')}`);
+
+                // 更新設定
+                systemState.autoCycle.interval = data.interval;
+                systemState.autoCycle.modes = data.modes;
+
+                if (data.enabled) {
+                    // 找出當前模式在循環列表中的索引
+                    const currentIndex = data.modes.indexOf(systemState.contentMode);
+                    systemState.autoCycle.currentIndex = currentIndex !== -1 ? currentIndex : 0;
+                    
+                    startAutoCycle();
+                } else {
+                    stopAutoCycle();
+                }
+
+                saveSystemState();
             }
-            
-            // 取得系統狀態
-            if (data.type === 'getSystemState') {
-                ws.send(JSON.stringify({
-                    type: 'systemStateUpdate',
-                    state: systemState,
-                    timestamp: Date.now()
-                }));
-            }
-            
-            // 心跳檢測
-            if (data.type === 'ping') {
-                ws.send(JSON.stringify({
-                    type: 'pong',
-                    timestamp: Date.now()
-                }));
+
+            // 更新循環設定（不改變啟用狀態）
+            if (data.type === 'updateCycleSettings') {
+                console.log(`\n⚙️  更新自動循環設定`);
+                console.log(`   循環間隔: ${data.interval} 分鐘`);
+                console.log(`   循環模式: ${data.modes.join(', ')}`);
+
+                systemState.autoCycle.interval = data.interval;
+                systemState.autoCycle.modes = data.modes;
+                
+                // 如果循環正在運行，重置計時器
+                if (systemState.autoCycle.enabled) {
+                    // 只有在 currentIndex 不是 -1（非手動切換狀態）時才更新索引
+                    if (systemState.autoCycle.currentIndex !== -1) {
+                        const currentModeIndex = data.modes.indexOf(systemState.contentMode);
+                        if (currentModeIndex !== -1) {
+                            systemState.autoCycle.currentIndex = currentModeIndex;
+                        } else {
+                            systemState.autoCycle.currentIndex = 0;
+                        }
+                    }
+                    // 如果 currentIndex 是 -1，保持 -1 不變（手動切換狀態）
+                    
+                    resetAutoCycleTimer();
+                    console.log(`   🔄 循環設定已更新，計時器已重置`);
+                }
+
+                saveSystemState();
+                broadcastAutoCycleStatus();
             }
             
             // OSC 設定查詢
@@ -380,7 +589,7 @@ function broadcast(data, excludeWs = null) {
         }
     });
     
-    if (data.type === 'modeUpdate') {
+    if (data.type === 'modeUpdate' || data.type === 'autoCycleUpdate') {
         console.log(`   ✉️  已廣播給 ${sentCount} 個客戶端`);
     }
 }
@@ -390,7 +599,6 @@ function handleMadmapperControl(data) {
     const oscAddress = `/surfaces/${data.surface}/opacity`;
     const oscValue = data.enabled ? 1.0 : 0.0;
     
-    // console.log(`\n🎨 MadMapper 控制:`);
     console.log(`   surface: ${data.surface}`);
     console.log(`   address: ${oscAddress} value: ${oscValue} (${data.enabled ? 'open' : 'close'})`);
     console.log(`   url: ${OSC_CONFIG.madmapperIp}:${OSC_CONFIG.madmapperPort}`);
@@ -417,7 +625,6 @@ function handleMaskControl(data) {
     const oscAddress = '/mask';
     const maskId = parseInt(data.maskId);
     
-    // console.log(`\n🎭 Mask 控制:`);
     console.log(`   mask ID: ${maskId}`);
     console.log(`   address: ${oscAddress}`);
     console.log(`   url: ${OSC_CONFIG.objectTrackerIp}:${OSC_CONFIG.objectTrackerPort}`);
@@ -477,6 +684,12 @@ function printStatus() {
     const activeSurfaces = Object.keys(systemState.surfaceStates).filter(k => systemState.surfaceStates[k]).length;
     const totalSurfaces = Object.keys(systemState.surfaceStates).length;
     console.log(`   開啟的 Surface: ${activeSurfaces}/${totalSurfaces}`);
+    
+    if (systemState.autoCycle.enabled) {
+        const minutes = Math.floor(systemState.autoCycle.remainingSeconds / 60);
+        const seconds = systemState.autoCycle.remainingSeconds % 60;
+        console.log(`   🔄 自動循環: 啟用中 (剩餘 ${minutes}:${String(seconds).padStart(2, '0')})`);
+    }
 }
 
 // 啟動後顯示資訊
@@ -494,6 +707,9 @@ setInterval(() => {
 // 清理資源
 process.on('SIGINT', () => {
     console.log('\n\n⏹️  正在關閉伺服器...');
+    
+    // 停止自動循環
+    stopAutoCycle();
     
     // 通知所有客戶端
     broadcast({
