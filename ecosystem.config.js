@@ -4,7 +4,7 @@ module.exports = {
     script: './integrated-server.js',
     
     // 指定工作目錄（改為你的專案路徑）
-    cwd: 'C:\Users\User\Unity_Remote_System',
+    cwd: 'C:\BitoStudio\repositories\Unity_Remote_System',
     
     // 自動重啟設定
     watch: false,

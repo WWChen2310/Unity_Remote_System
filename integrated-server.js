@@ -15,9 +15,6 @@ const OSC_CONFIG = {
     madmapperIp: '192.168.0.202',      // MadMapper 電腦的 IP
     madmapperPort: 8010,                // MadMapper OSC 接收端口
     
-    objectTrackerIp: '192.168.0.201',  // Object Tracker 主機 IP
-    objectTrackerPort: 8000,            // Object Tracker OSC 接收端口
-    
     localPort: 9000                     // 本地發送端口
 };
 
@@ -56,7 +53,6 @@ udpPort.open();
 udpPort.on('ready', () => {
     console.log(`\n🎵 OSC 已就緒，監聽端口: ${OSC_CONFIG.localPort}`);
     console.log(`   MadMapper 目標: ${OSC_CONFIG.madmapperIp}:${OSC_CONFIG.madmapperPort}`);
-    console.log(`   ObjectTracker 目標: ${OSC_CONFIG.objectTrackerIp}:${OSC_CONFIG.objectTrackerPort}`);
 });
 
 udpPort.on('error', (error) => {
@@ -619,40 +615,17 @@ function handleMadmapperControl(data) {
 
 // Mask 控制
 function handleMaskControl(data) {
-    const oscAddress = '/mask';
     const maskId = parseInt(data.maskId);
-    
     console.log(`   mask ID: ${maskId}`);
-    console.log(`   address: ${oscAddress}`);
-    console.log(`   url: ${OSC_CONFIG.objectTrackerIp}:${OSC_CONFIG.objectTrackerPort}`);
-    
-    try {
-        udpPort.send({
-            address: oscAddress,
-            args: [
-                {
-                    type: 'i',  // integer
-                    value: maskId
-                }
-            ]
-        }, OSC_CONFIG.objectTrackerIp, OSC_CONFIG.objectTrackerPort);
-        
-        console.log(`   ✅ OSC 訊息已發送`);
-    } catch (error) {
-        console.error(`   ❌ OSC 發送失敗:`, error.message);
-    }
 }
 
 // 更新 OSC 設定
 function updateOSCConfig(newConfig) {
     if (newConfig.madmapperIp) OSC_CONFIG.madmapperIp = newConfig.madmapperIp;
     if (newConfig.madmapperPort) OSC_CONFIG.madmapperPort = parseInt(newConfig.madmapperPort);
-    if (newConfig.objectTrackerIp) OSC_CONFIG.objectTrackerIp = newConfig.objectTrackerIp;
-    if (newConfig.objectTrackerPort) OSC_CONFIG.objectTrackerPort = parseInt(newConfig.objectTrackerPort);
     
     console.log(`\n🔄 OSC 設定已更新:`);
     console.log(`   MadMapper IP: ${OSC_CONFIG.madmapperIp}:${OSC_CONFIG.madmapperPort}`);
-    console.log(`   ObjectTracker IP: ${OSC_CONFIG.objectTrackerIp}:${OSC_CONFIG.objectTrackerPort}`);
 }
 
 // 顯示網路資訊
