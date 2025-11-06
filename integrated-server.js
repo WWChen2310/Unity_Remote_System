@@ -411,7 +411,15 @@ wss.on('connection', (ws, req) => {
                     console.log(`   🔄 手動切換，自動循環計時器已重置，下次將從列表第一項開始循環`);
                 }
                 
-                // 廣播給其他客戶端
+                // 廣播 modeUpdate 給所有客戶端（包括 Unity）
+                broadcast({
+                    type: 'modeUpdate',
+                    mode: systemState.contentMode,
+                    source: data.manual ? 'manual' : 'web',
+                    timestamp: Date.now()
+                });
+                
+                // 廣播 modeStatusUpdate 給其他網頁客戶端（用於 UI 更新）
                 broadcast({
                     type: 'modeStatusUpdate',
                     mode: systemState.contentMode,
@@ -419,18 +427,7 @@ wss.on('connection', (ws, req) => {
                     timestamp: Date.now()
                 }, ws);
                 
-                // 發送給所有 Unity 客戶端
-                unityClients.forEach(client => {
-                    if (client.readyState === WebSocket.OPEN) {
-                        client.send(JSON.stringify({
-                            type: 'modeUpdate',
-                            mode: systemState.contentMode,
-                            timestamp: Date.now()
-                        }));
-                    }
-                });
-                
-                console.log(`   ✅ 已更新並廣播`);
+                console.log(`   ✅ 已更新並廣播給所有客戶端`);
             }
 
             // 自動循環控制
