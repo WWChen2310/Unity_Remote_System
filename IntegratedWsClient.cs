@@ -7,36 +7,50 @@ using System.Threading.Tasks;
 using UnityEngine;
 
 /// <summary>
-/// ³s¤W integrated-server ªº WebSocket Client¡A±Mªù¦P¨B maskId ¨ì ObjectDetector¡C
-/// - ³s½u¦¨¥\«á¡G°e¥X {clientType:"unity"}¡Aµ¥«İ systemStateUpdate -> ¨ú state.maskMode¡C
-/// - «áÄò«ùÄòºÊÅ¥ maskStatusUpdate -> ¨ú maskId¡C
-/// - ¥Dºü±Æµ{¡G©Ò¦³ Unity API ©I¥s³£¸g¥Ñ¥Dºü¦î¦C°õ¦æ¡C
-/// - ¦Û°Ê­«³s + «ü¼Æ°hÁ×¡C
+/// é€£ä¸Š integrated-server çš„ WebSocket Clientï¼Œå°ˆé–€åŒæ­¥ maskId è‡³ ObjectDetectorã€‚
+/// æ”¹é€²ç‰ˆæœ¬ï¼šå¢å¼·é€£ç·šç‹€æ…‹ç›£æ§å’ŒéŒ¯èª¤è™•ç†
 /// </summary>
 public class IntegratedWsClient : MonoBehaviour
 {
     [Header("Server")]
-    [Tooltip("e.g. ws://192.168.0.200:3000")]
-    public string serverUrl = "ws://127.0.0.1:3000";
+    [Tooltip("e.g. ws://192.168.0.201:3000")]
+    public string serverUrl = "ws://192.168.0.201:3000";
 
     [Header("Targets")]
     public ObjectDetector objectDetector;
 
     [Header("Options")]
     public bool autoConnectOnStart = true;
-    [Tooltip("³Ì¤j±µ¦¬°T®§¤j¤p (bytes)")]
+    [Tooltip("æœ€å¤§æ¥æ”¶è¨Šæ¯å¤§å° (bytes)")]
     public int receiveBufferSize = 16 * 1024;
+    [Tooltip("é€£ç·šç‹€æ…‹æ›´æ–°é–“éš” (ç§’)")]
+    public float statusUpdateInterval = 30f;
 
-    // === ¤º³¡ª¬ºA ===
+    [Header("Connection Status")]
+    [SerializeField] private ConnectionState currentState = ConnectionState.Disconnected;
+    [SerializeField] private int reconnectAttempt = 0;
+    [SerializeField] private float nextReconnectTime = 0f;
+
+    // === å…§éƒ¨ç‹€æ…‹ ===
     private ClientWebSocket _ws;
     private CancellationTokenSource _cts;
     private readonly ConcurrentQueue<Action> _mainThreadActions = new ConcurrentQueue<Action>();
     private Task _runnerTask;
     private volatile bool _isClosing;
-    private int _latestMaskId = -1;     // ³Ìªñ¤@¦¸±q WS ±o¨ìªº maskId
-    private bool _pendingApplyOnCalibrated = false; // µ¥«İ ObjectDetector ªì©l¤Æ§¹¦¨®É¸É ApplyMask
+    private int _latestMaskId = -1;
+    private bool _pendingApplyOnCalibrated = false;
+    private float _lastStatusUpdate = 0f;
+    private DateTime _connectedAt;
 
-    // JSON «Ê¸Ë¡]¥Î JsonUtility¡^
+    public enum ConnectionState
+    {
+        Disconnected,
+        Connecting,
+        Connected,
+        Reconnecting
+    }
+
+    // JSON çµæ§‹
     [Serializable] private class SystemState { public int contentMode; public int maskMode; }
     [Serializable]
     private class MessageEnvelope
@@ -44,11 +58,12 @@ public class IntegratedWsClient : MonoBehaviour
         public string type;
         public int mode;
         public long timestamp;
-        public SystemState state; // for systemStateUpdate
-        public int maskId;        // for maskStatusUpdate
-        public string clientType; // we send this when identifying ourselves
+        public SystemState state;
+        public int maskId;
+        public string clientType;
         public bool success;
         public string source;
+        public string message;
     }
 
     void Start()
@@ -58,45 +73,80 @@ public class IntegratedWsClient : MonoBehaviour
 
     void Update()
     {
-        // ±N­I´ººü±Æ¤Jªº¥Dºü¤u§@¨ú¥X°õ¦æ¡]¨Ò¦p ApplyMask¡^
+        // åŸ·è¡Œä¸»ç·šç¨‹å·¥ä½œéšŠåˆ—
         while (_mainThreadActions.TryDequeue(out var act))
-            try { act?.Invoke(); } catch (Exception e) { Debug.LogException(e); }
+        {
+            try { act?.Invoke(); }
+            catch (Exception e) { Debug.LogException(e); }
+        }
 
-        // ­Yµ¥ªì©l¤Æ§¹¦¨¤~¸É ApplyMask
+        // ç­‰å¾…æ ¡æ­£å®Œæˆå¾Œæ‡‰ç”¨ Mask
         if (_pendingApplyOnCalibrated && objectDetector != null && objectDetector.IsCalibrated)
         {
             _pendingApplyOnCalibrated = false;
             EnqueueMainThread(() => SafeApplyMask(_latestMaskId));
         }
+
+        // å®šæœŸç‹€æ…‹æ›´æ–°
+        if (currentState == ConnectionState.Connected && 
+            Time.time - _lastStatusUpdate >= statusUpdateInterval)
+        {
+            _lastStatusUpdate = Time.time;
+            var uptime = DateTime.Now - _connectedAt;
+            Debug.Log($"[WS] â„¹ï¸ é€£ç·šæ­£å¸¸ | Uptime: {uptime.TotalMinutes:F1} åˆ†é˜ | MaskID: {_latestMaskId}");
+        }
     }
 
     void OnDisable()
     {
-        // µ²§ô®ÉÃö³¬³s½u
         _ = CloseAsync();
     }
 
-    /// <summary>¤â°ÊÄ²µo³s½u</summary>
+    void OnApplicationQuit()
+    {
+        _ = CloseAsync();
+    }
+
+    // ===== å…¬é–‹æ–¹æ³• =====
+
     [ContextMenu("Connect")]
     public void Connect()
     {
-        if (_runnerTask != null && !_runnerTask.IsCompleted) return;
+        if (_runnerTask != null && !_runnerTask.IsCompleted)
+        {
+            Debug.Log("[WS] ğŸ”µ å·²ç¶“åœ¨é€£ç·šæµç¨‹ä¸­");
+            return;
+        }
+        
         _isClosing = false;
         _cts = new CancellationTokenSource();
         _runnerTask = Task.Run(() => RunLoop(_cts.Token));
+        Debug.Log("[WS] ğŸ”Œ å•Ÿå‹•é€£ç·šæµç¨‹...");
     }
 
-    /// <summary>¤â°Ê¤¤Â_¨Ã­«³s</summary>
     [ContextMenu("Reconnect")]
     public async void Reconnect()
     {
+        Debug.Log("[WS] ğŸ”„ æ‰‹å‹•é‡æ–°é€£ç·š...");
         await CloseAsync();
         Connect();
     }
 
+    [ContextMenu("Disconnect")]
+    public async void Disconnect()
+    {
+        Debug.Log("[WS] ğŸ”Œ æ‰‹å‹•æ–·ç·š...");
+        await CloseAsync();
+    }
+
+    // ===== å…§éƒ¨æ–¹æ³• =====
+
     private async Task CloseAsync()
     {
         try { _isClosing = true; } catch { }
+        
+        currentState = ConnectionState.Disconnected;
+        
         try
         {
             _cts?.Cancel();
@@ -105,7 +155,10 @@ public class IntegratedWsClient : MonoBehaviour
                 await _ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "closing", CancellationToken.None);
             }
         }
-        catch { /* ignore */ }
+        catch (Exception e)
+        {
+            Debug.LogWarning($"[WS] é—œé–‰æ™‚ç™¼ç”ŸéŒ¯èª¤: {e.Message}");
+        }
         finally
         {
             try { _ws?.Dispose(); } catch { }
@@ -113,10 +166,10 @@ public class IntegratedWsClient : MonoBehaviour
         }
     }
 
-    // === ­I´º¥D°j°é¡]¦Û°Ê­«³s + ¦¬µo¡^===
+    // èƒŒæ™¯ä¸»å¾ªç’°ï¼ˆè‡ªå‹•é‡é€£ + æ¥æ”¶ï¼‰
     private async Task RunLoop(CancellationToken ct)
     {
-        var backoff = new[] { 0.5f, 1f, 2f, 4f, 8f, 10f };
+        var backoff = new[] { 0.5f, 1f, 2f, 3f, 5f, 8f, 10f, 15f, 20f, 30f };
         int tries = 0;
 
         while (!ct.IsCancellationRequested && !_isClosing)
@@ -125,36 +178,73 @@ public class IntegratedWsClient : MonoBehaviour
             {
                 using (_ws = new ClientWebSocket())
                 {
-#if UNITY_EDITOR || UNITY_STANDALONE
-                    // ¦b¬Y¨Ç¥­¥x»İ­n¤¹³\¤£¦w¥ş/¦ÛÃ±¾ÌÃÒ±¡¹Ò¡A­Y¦³»İ­n¥i¦b¦¹°t¸m
-#endif
                     var uri = new Uri(serverUrl);
+                    
+                    // è¨­ç½®é€£ç·šç‹€æ…‹
+                    EnqueueMainThread(() => {
+                        currentState = tries > 0 ? ConnectionState.Reconnecting : ConnectionState.Connecting;
+                        reconnectAttempt = tries;
+                    });
+                    
                     await _ws.ConnectAsync(uri, ct);
 
-                    tries = 0; // ³s¤W«á­«¸m°hÁ×
-                    Debug.Log("[WS] Connected: " + serverUrl);
+                    tries = 0; // é€£ä¸Šå¾Œé‡ç½®é€€é¿
+                    _connectedAt = DateTime.Now;
+                    _lastStatusUpdate = Time.time;
+                    
+                    EnqueueMainThread(() => {
+                        currentState = ConnectionState.Connected;
+                        reconnectAttempt = 0;
+                    });
+                    
+                    Debug.Log($"[WS] âœ… Connected: {serverUrl}");
 
-                    // ¨­¥÷µù¥U¡GclientType = "unity"
-                    await SendJsonAsync(new MessageEnvelope { clientType = "unity" }, ct);
+                    // èº«åˆ†è­˜åˆ¥ï¼šclientType = "unity"
+                    await SendJsonAsync(new MessageEnvelope { 
+                        clientType = "unity",
+                        source = $"IntegratedWsClient@{Application.platform}"
+                    }, ct);
 
-                    // ±Ò°Ê±µ¦¬°j°é
+                    // è«‹æ±‚å®Œæ•´ç³»çµ±ç‹€æ…‹
+                    await SendJsonAsync(new MessageEnvelope { type = "getState" }, ct);
+                    Debug.Log("[WS] ğŸ“¡ å·²è«‹æ±‚ç³»çµ±ç‹€æ…‹åŒæ­¥");
+
+                    // å•Ÿå‹•æ¥æ”¶å¾ªç’°
                     await ReceiveLoop(ct);
                 }
             }
-            catch (OperationCanceledException) { /* Ãö³¬/¸õ¥X */ }
+            catch (OperationCanceledException)
+            {
+                Debug.Log("[WS] â¹ï¸ é€£ç·šå·²å–æ¶ˆ");
+            }
             catch (Exception e)
             {
-                if (!_isClosing) Debug.LogWarning("[WS] Disconnected: " + e.Message);
+                if (!_isClosing)
+                {
+                    Debug.LogWarning($"[WS] âŒ Disconnected: {e.Message}");
+                    
+                    EnqueueMainThread(() => {
+                        currentState = ConnectionState.Disconnected;
+                    });
+                }
             }
 
             if (ct.IsCancellationRequested || _isClosing) break;
 
-            // ­«³s°hÁ×
+            // é‡é€£é€€é¿
             float wait = backoff[Mathf.Min(tries, backoff.Length - 1)];
             tries++;
+            
+            EnqueueMainThread(() => {
+                nextReconnectTime = Time.time + wait;
+            });
+            
+            Debug.Log($"[WS] ğŸ”„ Reconnecting in {wait:F1}s... (attempt #{tries})");
+            
             await Task.Delay(TimeSpan.FromSeconds(wait), ct);
-            Debug.Log($"[WS] Reconnecting... (after {wait:0.0}s)");
         }
+
+        Debug.Log("[WS] ğŸ”š é€£ç·šå¾ªç’°å·²çµæŸ");
     }
 
     private async Task ReceiveLoop(CancellationToken ct)
@@ -166,12 +256,14 @@ public class IntegratedWsClient : MonoBehaviour
             var sb = new StringBuilder();
             WebSocketReceiveResult result;
 
-            // Åª¤@­Ó§¹¾ã°T®§¡]¥i¯à¤À¤ù¡^
+            // è®€ä¸€å€‹å®Œæ•´è¨Šæ¯ï¼ˆå¯èƒ½åˆ†ç‰‡ï¼‰
             do
             {
                 result = await _ws.ReceiveAsync(buffer, ct);
+                
                 if (result.MessageType == WebSocketMessageType.Close)
                 {
+                    Debug.Log($"[WS] âš ï¸ Server initiated close: {result.CloseStatus}");
                     await _ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "server close", ct);
                     return;
                 }
@@ -188,35 +280,47 @@ public class IntegratedWsClient : MonoBehaviour
 
     private async Task SendJsonAsync(object payload, CancellationToken ct)
     {
-        var json = JsonUtility.ToJson(payload);
-        var bytes = Encoding.UTF8.GetBytes(json);
-        var seg = new ArraySegment<byte>(bytes);
-        if (_ws != null && _ws.State == WebSocketState.Open)
-            await _ws.SendAsync(seg, WebSocketMessageType.Text, true, ct);
+        try
+        {
+            var json = JsonUtility.ToJson(payload);
+            var bytes = Encoding.UTF8.GetBytes(json);
+            var seg = new ArraySegment<byte>(bytes);
+            
+            if (_ws != null && _ws.State == WebSocketState.Open)
+            {
+                await _ws.SendAsync(seg, WebSocketMessageType.Text, true, ct);
+            }
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning($"[WS] ç™¼é€è¨Šæ¯å¤±æ•—: {e.Message}");
+        }
     }
 
-    // === °T®§³B²z ===
+    // ===== è¨Šæ¯è™•ç† =====
+
     private void HandleMessage(string json)
     {
         MessageEnvelope msg = null;
         try { msg = JsonUtility.FromJson<MessageEnvelope>(json); }
         catch (Exception e)
         {
-            Debug.LogWarning("[WS] JSON parse failed: " + e.Message + "\n" + json);
+            Debug.LogWarning($"[WS] JSON parse failed: {e.Message}\n{json}");
             return;
         }
         if (msg == null) return;
 
-        // 1) ªì©l§¹¾ã¨t²Îª¬ºA¡]¥]§t maskMode¡^
+        // 1) åˆå§‹å®Œæ•´ç³»çµ±ç‹€æ…‹ï¼ˆåŒ…å« maskModeï¼‰
         if (msg.type == "systemStateUpdate" && msg.state != null)
         {
-            int mask = msg.state.maskMode; // ¦øªA¾¹¼s¼½ªºÄæ¦ì¦WºÙ
+            int mask = msg.state.maskMode;
             _latestMaskId = mask;
             OnMaskIdArrived(mask, reason: "systemStateUpdate");
+            Debug.Log($"[WS] ğŸ“Š ç³»çµ±ç‹€æ…‹åŒæ­¥å®Œæˆ: contentMode={msg.state.contentMode}, maskMode={mask}");
             return;
         }
 
-        // 2) «áÄò­±¸nÅÜ§ó¨Æ¥ó¡]¨ä¥Lºİ¤Á´«¡^
+        // 2) å¾ŒçºŒé®ç½©è®Šæ›´äº‹ä»¶ï¼ˆå…¶ä»–ç«¯æ“ä½œï¼‰
         if (msg.type == "maskStatusUpdate")
         {
             int mask = msg.maskId;
@@ -225,18 +329,29 @@ public class IntegratedWsClient : MonoBehaviour
             return;
         }
 
-        // ¨ä¥L°T®§¡]modeUpdate/autoCycleUpdate/¡K¡^¥iµø»İ­nÂX¥R
+        // 3) ä¼ºæœå™¨é—œé–‰é€šçŸ¥
+        if (msg.type == "serverShutdown")
+        {
+            Debug.LogWarning($"[WS] âš ï¸ ä¼ºæœå™¨å³å°‡é—œé–‰: {msg.message}");
+            return;
+        }
+
+        // å…¶ä»–è¨Šæ¯é¡å‹å¯è¦–éœ€è¦æ“´å……
     }
 
-    // ±N maskId ¼g¤J ObjectDetector¡A¨Ã¨M©w¬O§_¥ß§Y ApplyMask ©Î©µ«á
+    // å°‡ maskId å¯«å…¥ ObjectDetectorï¼Œä¸¦æ±ºå®šæ˜¯å¦ç«‹å³ ApplyMask æˆ–ç­‰å¾Œ
     private void OnMaskIdArrived(int maskId, string reason)
     {
-        if (objectDetector == null) return;
+        if (objectDetector == null)
+        {
+            Debug.LogWarning("[WS] âš ï¸ ObjectDetector æœªè¨­å®šï¼Œç„¡æ³•æ‡‰ç”¨ Mask");
+            return;
+        }
 
-        // ¥ı§âÄæ¦ì³]¥¿½T¡A½T«O¤§«á ObjectDetector ªì©l¤Æ¬yµ{·|¥Î¹ïªº _maskId
+        // å…ˆå°‡æ•¸å€¼è¨­å®šç¢ºä¿ï¼Œç¢ºä¿ä¹‹å¾Œ ObjectDetector åˆå§‹åŒ–æµç¨‹æœƒå¥—ç”¨æ­£ç¢º _maskId
         objectDetector._maskId = maskId;
 
-        // ­Y¤w§¹¦¨°ò·Ç/¤Ø¤oµ¥ªì©l¤Æ¡A¥i¥ß¨è Apply¡F§_«hµ¥ªì©l¤Æ§¹¦¨¸É Apply
+        // è‹¥å·²å®Œæˆæ ¡æ­£/ä¸å¿…ç­‰æ ¡æ­£ï¼Œå¯ç«‹å³ Applyï¼›å¦å‰‡ç­‰æ ¡æ­£å®Œæˆæ™‚ Apply
         if (objectDetector.IsCalibrated)
         {
             EnqueueMainThread(() => SafeApplyMask(maskId));
@@ -244,25 +359,37 @@ public class IntegratedWsClient : MonoBehaviour
         else
         {
             _pendingApplyOnCalibrated = true;
+            Debug.Log($"[WS] â³ Mask å°‡åœ¨æ ¡æ­£å®Œæˆå¾Œå¥—ç”¨: maskId = {maskId}");
         }
 
-        // ªş±a Debug
-        Debug.Log($"[WS] Mask sync ({reason}): maskId = {maskId}");
+        Debug.Log($"[WS] ğŸ­ Mask sync ({reason}): maskId = {maskId}");
     }
 
     private void SafeApplyMask(int maskId)
     {
         try
         {
-            // §Aªº ObjectDetector.ApplyMask(maskId) ·|ÀË¬d mask ¤Ø¤o»P²`«×¼v¹³¤Ø¤o¬O§_¤@­P
-            // ­Y¦¹®É _w/_h ©|¥¼«Ø¥ß¡A³o¸Ì¤£·|©I¥s¡F¦ı¥¿±`¨Ó»¡ IsCalibrated==true ®É´N·|¦³­È
+            if (objectDetector == null)
+            {
+                Debug.LogWarning("[WS] âš ï¸ ObjectDetector å·²è¢«ç§»é™¤");
+                return;
+            }
+
             objectDetector.ApplyMask(maskId);
+            Debug.Log($"[WS] âœ… Mask å·²å¥—ç”¨: maskId = {maskId}");
         }
         catch (Exception e)
         {
-            Debug.LogWarning($"[WS] ApplyMask({maskId}) failed: {e.Message}");
+            Debug.LogWarning($"[WS] âŒ ApplyMask({maskId}) failed: {e.Message}");
         }
     }
 
     private void EnqueueMainThread(Action act) => _mainThreadActions.Enqueue(act);
+
+    // ===== å…¬é–‹ç‹€æ…‹æŸ¥è©¢ =====
+
+    public bool IsConnected() => currentState == ConnectionState.Connected;
+    public ConnectionState GetConnectionState() => currentState;
+    public int GetLatestMaskId() => _latestMaskId;
+    public int GetReconnectAttempt() => reconnectAttempt;
 }
