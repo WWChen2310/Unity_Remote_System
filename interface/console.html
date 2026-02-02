@@ -26,7 +26,7 @@
             background-image: url('assets/Room_logo-(1).png');
             background-position: center;
             background-size: contain;
-            background-repeat: no-repeat;
+            background-repeat: no-repeat; /* 建議加上，確保圖片不重複 */
         }
         .container {
             max-width: 600px;
@@ -172,14 +172,50 @@
             background: #f8f9fa;
             border-radius: 8px;
         }
-
-        /* 連線狀態動畫 */
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
+        .disabled-section {
+            opacity: 0.5;
+            pointer-events: none;
+            filter: grayscale(100%);
         }
-        .status-badge.reconnecting {
-            animation: pulse 1.5s ease-in-out infinite;
+        .table-control-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr); /* 4列 */
+            gap: 10px;
+        }
+        .table-btn-group {
+            display: flex;
+            gap: 2px;
+            margin-top: 5px;
+        }
+        .table-btn {
+            flex: 1;
+            padding: 6px 0;
+            font-size: 11px;
+            border: 1px solid #dee2e6;
+            background-color: #f8f9fa;
+            color: #6c757d;
+            border-radius: 4px;
+            transition: all 0.15s ease;
+            font-weight: bold;
+        }
+        .table-btn.active {
+            background-color: #0d6efd !important;
+            color: white !important;
+            border-color: #0d6efd !important;
+            box-shadow: 0 2px 4px rgba(13, 110, 253, 0.3);
+        }
+        .disabled-section .table-btn {
+            background-color: #e9ecef;
+            border-color: #dee2e6;
+            color: #adb5bd;
+        }
+        .table-btn:active {
+            transform: translateY(1px);
+        }
+        @media (max-width: 500px) {
+            .table-control-grid {
+                grid-template-columns: repeat(2, 1fr); /* 手機版2列 */
+            }
         }
     </style>
 </head>
@@ -195,9 +231,6 @@
                     <i class="bi bi-circle-fill"></i>
                     <span id="statusText">未連接</span>
                 </span>
-                <div class="info-text mt-2">
-                    <small id="reconnectInfo"></small>
-                </div>
             </div>
         </div>
 
@@ -217,7 +250,163 @@
             </div>
         </div>
 
-        <!-- 自動循環控制 -->
+        <!-- 內容控制 -->
+        <div class="card">
+            <div class="card-body">
+                <h6 class="card-subtitle mb-3 text-muted">
+                    <i class="bi bi-film"></i> 內容模式
+                </h6>
+                <div class="row g-2">
+                    <div class="col-12">
+                        <button class="btn btn-outline-secondary mode-btn w-100" onclick="switchContentMode(8)" id="content8" name="分割內容">
+                            <i class="bi bi-grid-1x2"></i>
+                            <div>分割內容</div>
+                        </button>
+                    </div>
+                    <div class="col-4">
+                        <button class="btn btn-outline-secondary mode-btn w-100" onclick="switchContentMode(1)" id="content1" name="入場">
+                            <i class="bi bi-1-circle"></i>
+                            <div>入場</div>
+                        </button>
+                    </div>
+                    <div class="col-4">
+                        <button class="btn btn-outline-secondary mode-btn w-100" onclick="switchContentMode(2)" id="content2" name="海洋">
+                            <i class="bi bi-2-circle"></i>
+                            <div>海洋</div>
+                        </button>
+                    </div>
+                    <div class="col-4">
+                        <button class="btn btn-outline-secondary mode-btn w-100" onclick="switchContentMode(3)" id="content3" name="森林">
+                            <i class="bi bi-3-circle"></i>
+                            <div>森林</div>
+                        </button>
+                    </div>
+                    <div class="col-4">
+                        <button class="btn btn-outline-secondary mode-btn w-100" onclick="switchContentMode(4)" id="content4" name="稻田">
+                            <i class="bi bi-4-circle"></i>
+                            <div>稻田</div>
+                        </button>
+                    </div>
+                    <div class="col-4">
+                        <button class="btn btn-outline-secondary mode-btn w-100" onclick="switchContentMode(5)" id="content5" name="水草">
+                            <i class="bi bi-5-circle"></i>
+                            <div>水草</div>
+                        </button>
+                    </div>
+                    <div class="col-4">
+                        <button class="btn btn-outline-secondary mode-btn w-100" onclick="switchContentMode(7)" id="content7" name="萬聖節">
+                            <i class="fa fa-ghost"></i>
+                            <div>萬聖節</div>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h6 class="card-subtitle text-muted mb-0">
+                        <i class="bi bi-layout-split"></i> 桌面個別控制
+                    </h6>
+                    <small class="text-danger" id="splitModeHint" style="display:none;">(僅在分割內容模式下可用)</small>
+                </div>
+                
+                <div id="tableControlPanel" class="table-control-grid disabled-section">
+                    </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <h6 class="card-subtitle mb-3 text-muted">
+                    <i class="bi bi-tools"></i> 工作畫面
+                </h6>
+                <div class="row g-2">
+                    <div class="col-4">
+                        <button class="btn btn-outline-secondary mode-btn w-100" onclick="switchContentMode(6)" id="content6" name="全白畫面">
+                            <i class="bi bi-brightness-high"></i>
+                            <div>全白畫面</div>
+                        </button>
+                    </div>
+                    <div class="col-4">
+                        <button class="btn btn-outline-secondary mode-btn w-100" onclick="switchContentMode(0)" id="content0" name="校正畫面">
+                            <i class="bi bi-bounding-box-circles"></i>
+                            <div>校正畫面</div>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 桌面模式切換 -->
+        <div class="card">
+            <div class="card-body">
+                <h6 class="card-subtitle mb-3 text-muted">
+                    <i class="bi bi-projector"></i> 桌面模式
+                </h6>
+                <div class="row g-3">
+                    <div class="col-6">
+                        <button class="btn btn-outline-primary mask-mode-btn w-100" onclick="switchMaskMode(1)" id="mask1">
+                            <i class="bi bi-grid-3x3"></i>
+                            <div>合併</div>
+                        </button>
+                    </div>
+                    <div class="col-6">
+                        <button class="btn btn-outline-primary mask-mode-btn w-100" onclick="switchMaskMode(2)" id="mask2">
+                            <i class="bi bi-grid-3x3-gap"></i>
+                            <div>分散</div>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Surface 控制 - 模式一 -->
+        <div class="card" id="surfacesMode1">
+            <div class="card-body">
+                <h6 class="card-subtitle mb-3 text-muted">
+                    <i class="bi bi-grid"></i> 區域控制 - 合併
+                </h6>
+                <div class="surface-grid" id="surfaceGridMode1">
+                    <!-- 由 JS 動態生成 -->
+                </div>
+                <div class="mt-3">
+                    <button class="btn btn-sm btn-outline-primary w-100" onclick="toggleAllSurfacesInMode(1, true)">
+                        <i class="bi bi-check-all"></i> 全部開啟
+                    </button>
+                </div>
+                <div class="mt-2">
+                    <button class="btn btn-sm btn-outline-secondary w-100" onclick="toggleAllSurfacesInMode(1, false)">
+                        <i class="bi bi-x-circle"></i> 全部關閉
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Surface 控制 - 模式二 -->
+        <div class="card section-hidden" id="surfacesMode2">
+            <div class="card-body">
+                <h6 class="card-subtitle mb-3 text-muted">
+                    <i class="bi bi-grid"></i> 區域控制 - 分散
+                </h6>
+                <div class="surface-grid" id="surfaceGridMode2">
+                    <!-- 由 JS 動態生成 -->
+                </div>
+                <div class="mt-3">
+                    <button class="btn btn-sm btn-outline-primary w-100" onclick="toggleAllSurfacesInMode(2, true)">
+                        <i class="bi bi-check-all"></i> 全部開啟
+                    </button>
+                </div>
+                <div class="mt-2">
+                    <button class="btn btn-sm btn-outline-secondary w-100" onclick="toggleAllSurfacesInMode(2, false)">
+                        <i class="bi bi-x-circle"></i> 全部關閉
+                    </button>
+                </div>
+            </div>
+        </div>
+
+                <!-- 自動循環控制 -->
         <div class="card">
             <div class="card-body">
                 <h6 class="card-subtitle mb-3 text-muted">
@@ -246,19 +435,24 @@
                     </div>
                 </div>
 
-                <!-- 循環模式管理 -->
+                <!-- 循環模式列表 -->
                 <div>
-                    <label class="form-label">循環模式順序</label>
-                    <div id="cycleModesContainer"></div>
+                    <label class="form-label">循環模式列表</label>
+                    <div id="cycleModesContainer" class="mb-3">
+                        <!-- 動態生成的模式列表 -->
+                    </div>
+                    
+                    <!-- 新增模式 -->
                     <div class="add-mode-section">
                         <div class="row g-2">
                             <div class="col-8">
                                 <select class="form-select" id="newModeSelect">
-                                    <option value="1">模式 1</option>
-                                    <option value="2">模式 2</option>
-                                    <option value="3">模式 3</option>
-                                    <option value="4">模式 4</option>
-                                    <option value="5">模式 5</option>
+                                    <option value="1">入場 (ID: 1)</option>
+                                    <option value="2">海洋 (ID: 2)</option>
+                                    <option value="3">森林 (ID: 3)</option>
+                                    <option value="4">稻田 (ID: 4)</option>
+                                    <option value="5">水草 (ID: 5)</option>
+                                    <!-- <option value="7">萬聖節 (ID: 7)</option> -->
                                 </select>
                             </div>
                             <div class="col-4">
@@ -269,152 +463,61 @@
                         </div>
                     </div>
                 </div>
+
+                <small class="text-muted">
+                    <i class="bi bi-info-circle"></i> 可拖曳模式調整順序，手動切換或修改設定將重新開始計時
+                </small>
             </div>
         </div>
 
-        <!-- 內容模式 -->
+        <!-- 連線資訊 -->
         <div class="card">
             <div class="card-body">
                 <h6 class="card-subtitle mb-3 text-muted">
-                    <i class="bi bi-film"></i> 內容模式
+                    <i class="bi bi-info-circle"></i> 連線資訊
                 </h6>
-                <div class="row g-2">
-                    <div class="col-4">
-                        <button class="btn mode-btn w-100" onclick="setMode(1)">
-                            <div><i class="bi bi-sunrise"></i></div>
-                            <div>模式 1</div>
-                        </button>
+                <div class="info-text">
+                    <div class="mb-2">
+                        <i class="bi bi-hdd-network"></i>
+                        伺服器:<span id="serverUrl" class="text-dark">ws://localhost:3000</span>
                     </div>
-                    <div class="col-4">
-                        <button class="btn mode-btn w-100" onclick="setMode(2)">
-                            <div><i class="bi bi-cloud-sun"></i></div>
-                            <div>模式 2</div>
-                        </button>
+                    <div>
+                        <i class="bi bi-clock"></i>
+                        最後更新:<span id="lastUpdate" class="text-dark">--</span>
                     </div>
-                    <div class="col-4">
-                        <button class="btn mode-btn w-100" onclick="setMode(3)">
-                            <div><i class="bi bi-sunset"></i></div>
-                            <div>模式 3</div>
-                        </button>
-                    </div>
-                    <div class="col-4">
-                        <button class="btn mode-btn w-100" onclick="setMode(4)">
-                            <div><i class="bi bi-moon-stars"></i></div>
-                            <div>模式 4</div>
-                        </button>
-                    </div>
-                    <div class="col-4">
-                        <button class="btn mode-btn w-100" onclick="setMode(5)">
-                            <div><i class="bi bi-stars"></i></div>
-                            <div>模式 5</div>
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- 桌面模式 -->
-        <div class="card">
-            <div class="card-body">
-                <h6 class="card-subtitle mb-3 text-muted">
-                    <i class="bi bi-grid-3x3"></i> 桌面模式
-                </h6>
-                <div class="row g-2">
-                    <div class="col-6">
-                        <button class="btn mask-mode-btn w-100" onclick="setMaskMode(1)">
-                            <div>Quad-1~8</div>
-                        </button>
-                    </div>
-                    <div class="col-6">
-                        <button class="btn mask-mode-btn w-100" onclick="setMaskMode(2)">
-                            <div>Quad-9~16</div>
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- MadMapper 控制 -->
-        <div class="card">
-            <div class="card-body">
-                <h6 class="card-subtitle mb-3 text-muted">
-                    <i class="bi bi-sliders"></i> MadMapper Surface 控制
-                </h6>
-                
-                <!-- Quad-1~8 -->
-                <div id="maskMode1Section">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <small class="text-muted fw-bold">Quad-1~8</small>
-                        <div>
-                            <button class="btn btn-sm btn-outline-success me-1" onclick="toggleAllSurfacesInMode(1, true)">全開</button>
-                            <button class="btn btn-sm btn-outline-danger" onclick="toggleAllSurfacesInMode(1, false)">全關</button>
-                        </div>
-                    </div>
-                    <div class="surface-grid" id="surfaceGrid1"></div>
-                </div>
-
-                <hr class="my-3">
-
-                <!-- Quad-9~16 -->
-                <div id="maskMode2Section">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <small class="text-muted fw-bold">Quad-9~16</small>
-                        <div>
-                            <button class="btn btn-sm btn-outline-success me-1" onclick="toggleAllSurfacesInMode(2, true)">全開</button>
-                            <button class="btn btn-sm btn-outline-danger" onclick="toggleAllSurfacesInMode(2, false)">全關</button>
-                        </div>
-                    </div>
-                    <div class="surface-grid" id="surfaceGrid2"></div>
-                </div>
-            </div>
-        </div>
-
-        <!-- 頁尾資訊 -->
-        <div class="card">
-            <div class="card-body">
-                <div class="info-text text-center">
-                    <div>伺服器: <code id="serverUrl"></code></div>
-                    <div class="mt-1">最後更新: <span id="lastUpdate">--:--:--</span></div>
                 </div>
             </div>
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     <script>
-        // ===== 設定 =====
-        const serverUrl = 'ws://192.168.0.201:3000';
+        //#region settings
+        const serverUrl = '10.0.1.251';
+        const wsUrl = `ws://${serverUrl}:3000`;
         
-        // WebSocket
         let ws = null;
-        let reconnectAttempt = 0;
-        const maxReconnectAttempts = Infinity; // 無限重試
-        let reconnectTimeout = null;
-        let isManualDisconnect = false;
-        let connectionState = 'disconnected'; // 'disconnected', 'connecting', 'connected', 'reconnecting'
-
-        // 退避算法參數（秒）
-        const reconnectBackoff = [1, 2, 3, 5, 8, 10, 15, 20, 30];
-
-        // 當前狀態
-        let currentMode = 0;
-        let currentMaskMode = 0;
+        let currentContentMode = 1;
+        let currentMaskMode = 1;
         let surfaceStates = {};
-
-        // 自動循環
+        
+        // 自動循環相關變數
         let autoCycleEnabled = false;
-        let cycleModes = [1, 2, 3, 4, 5];
-        let cycleInterval = 10;
-        let remainingSeconds = 0;
+        let cycleModes = [1, 2, 3, 4, 5]; // 預設循環模式
+        let cycleInterval = 10; // 分鐘
         let cycleTimerInterval = null;
+        let remainingSeconds = 0;
 
-        // 模式名稱對應
+        // 模式名稱對照
         const modeNames = {
-            1: '模式 1',
-            2: '模式 2',
-            3: '模式 3',
-            4: '模式 4',
-            5: '模式 5'
+            0: '校正畫面',
+            1: '入場',
+            2: '海洋',
+            3: '森林',
+            4: '稻田',
+            5: '水草',
+            6: '全白畫面',
+            7: '萬聖節'
         };
 
         // Surface 設定（與伺服器保持一致）
@@ -440,295 +543,245 @@
             ]
         };
 
-        // ===== WebSocket 連線管理 =====
+        //#endregion
 
-        function connect() {
-            // 清除之前的重連計時器
-            if (reconnectTimeout) {
-                clearTimeout(reconnectTimeout);
-                reconnectTimeout = null;
-            }
+        //#region init & update methods
+        
+        // 初始化 Surface 網格
+        function initSurfaceGrids() {
+            // 模式 1
+            const grid1 = document.getElementById('surfaceGridMode1');
+            surfacesSettings[1].forEach(surface => {
+                const div = createSurfaceToggle(surface);
+                grid1.appendChild(div);
+                surfaceStates[surface.SurfaceName] = false;
+            });
 
-            // 避免重複連線
-            if (ws && (ws.readyState === WebSocket.CONNECTING || ws.readyState === WebSocket.OPEN)) {
-                console.log('🔵 已經在連線中或已連線，跳過重複連線');
-                return;
-            }
+            // 模式 2
+            const grid2 = document.getElementById('surfaceGridMode2');
+            surfacesSettings[2].forEach(surface => {
+                const div = createSurfaceToggle(surface);
+                grid2.appendChild(div);
+                surfaceStates[surface.SurfaceName] = false;
+            });
+        }
 
-            connectionState = reconnectAttempt > 0 ? 'reconnecting' : 'connecting';
-            updateConnectionStatus();
+        // 建立 Surface 切換元件
+        function createSurfaceToggle(surface) {
+            const div = document.createElement('div');
+            div.className = 'surface-toggle';
+            div.id = `surface-${surface.SurfaceName}`;
+            div.onclick = () => toggleSingleSurface(surface.SurfaceName);
+            
+            div.innerHTML = `
+                <div class="surface-name">${surface.ShowName}</div>
+                <div class="surface-status" id="status-${surface.SurfaceName}">關閉</div>
+            `;
+            
+            return div;
+        }
 
-            try {
-                ws = new WebSocket(serverUrl);
-                
-                ws.onopen = () => {
-                    console.log('✅ WebSocket 已連接');
-                    connectionState = 'connected';
-                    reconnectAttempt = 0; // 重置重連計數器
-                    isManualDisconnect = false;
-                    updateConnectionStatus();
-                    
-                    // 識別為網頁客戶端
-                    ws.send(JSON.stringify({
-                        clientType: 'web',
-                        userAgent: navigator.userAgent
-                    }));
-                    
-                    // 請求完整系統狀態
-                    ws.send(JSON.stringify({ type: 'getState' }));
-                };
-                
-                ws.onmessage = (event) => {
-                    try {
-                        const data = JSON.parse(event.data);
-                        handleMessage(data);
-                    } catch (error) {
-                        console.error('❌ 解析訊息失敗:', error);
-                    }
-                };
-                
-                ws.onerror = (error) => {
-                    console.error('❌ WebSocket 錯誤:', error);
-                };
-                
-                ws.onclose = (event) => {
-                    console.log('❌ WebSocket 已斷線:', event.code, event.reason);
-                    connectionState = 'disconnected';
-                    updateConnectionStatus();
-                    
-                    // 如果不是手動斷線，則嘗試重連
-                    if (!isManualDisconnect) {
-                        scheduleReconnect();
-                    }
-                };
-            } catch (error) {
-                console.error('❌ 建立連線失敗:', error);
-                connectionState = 'disconnected';
-                updateConnectionStatus();
-                scheduleReconnect();
+        function initTableControls() {
+            const container = document.getElementById('tableControlPanel');
+            container.innerHTML = '';
+            
+            for (let i = 0; i < 8; i++) {
+                const div = document.createElement('div');
+                div.className = 'p-2 border rounded bg-white shadow-sm';
+                div.innerHTML = `
+                    <label class="form-label small fw-bold mb-1 d-block text-center text-secondary">桌面 ${i + 1}</label>
+                    <div class="table-btn-group" id="table-group-${i}">
+                        <button class="table-btn" onclick="updateTableMode(${i}, 0)" data-val="0">0</button>
+                        <button class="table-btn" onclick="updateTableMode(${i}, 1)" data-val="1">1</button>
+                        <button class="table-btn" onclick="updateTableMode(${i}, 2)" data-val="2">2</button>
+                        <button class="table-btn" onclick="updateTableMode(${i}, 3)" data-val="3">3</button>
+                    </div>
+                `;
+                container.appendChild(div);
             }
         }
 
-        function scheduleReconnect() {
-            if (isManualDisconnect || reconnectAttempt >= maxReconnectAttempts) {
-                console.log('⏹️ 停止重連');
-                return;
-            }
+        // 當使用者改變下拉選單時
+        function updateTableMode(index, value) {
+            if (!ws || ws.readyState !== WebSocket.OPEN) return;
+            
+            // 如果目前模式不是 8，禁止操作桌面
+            if (currentContentMode !== 8) return;
 
-            // 使用退避算法計算等待時間
-            const backoffIndex = Math.min(reconnectAttempt, reconnectBackoff.length - 1);
-            const waitSeconds = reconnectBackoff[backoffIndex];
-            
-            console.log(`🔄 ${waitSeconds} 秒後重新連接... (第 ${reconnectAttempt + 1} 次嘗試)`);
-            
-            reconnectAttempt++;
-            connectionState = 'reconnecting';
-            updateConnectionStatus();
-            
-            reconnectTimeout = setTimeout(() => {
-                connect();
-            }, waitSeconds * 1000);
+            ws.send(JSON.stringify({
+                type: 'updateTableMode',
+                tableIndex: index,
+                mode: parseInt(value)
+            }));
         }
 
-        function disconnect() {
-            isManualDisconnect = true;
-            if (reconnectTimeout) {
-                clearTimeout(reconnectTimeout);
-                reconnectTimeout = null;
-            }
-            if (ws) {
-                ws.close();
-                ws = null;
-            }
-            connectionState = 'disconnected';
-            updateConnectionStatus();
-        }
-
-        function updateConnectionStatus() {
+        function updateStatus(connected) {
             const badge = document.getElementById('statusBadge');
-            const statusText = document.getElementById('statusText');
-            const reconnectInfo = document.getElementById('reconnectInfo');
+            const text = document.getElementById('statusText');
             
-            // 移除所有狀態 class
-            badge.classList.remove('bg-success', 'bg-danger', 'bg-warning', 'bg-secondary', 'reconnecting');
-            
-            switch (connectionState) {
-                case 'connected':
-                    badge.classList.add('bg-success');
-                    statusText.textContent = '已連接';
-                    reconnectInfo.textContent = '';
-                    break;
-                case 'connecting':
-                    badge.classList.add('bg-warning', 'reconnecting');
-                    statusText.textContent = '連接中...';
-                    reconnectInfo.textContent = '';
-                    break;
-                case 'reconnecting':
-                    badge.classList.add('bg-warning', 'reconnecting');
-                    statusText.textContent = '重新連接中...';
-                    const backoffIndex = Math.min(reconnectAttempt - 1, reconnectBackoff.length - 1);
-                    const waitSeconds = reconnectBackoff[backoffIndex];
-                    reconnectInfo.textContent = `第 ${reconnectAttempt} 次嘗試，${waitSeconds} 秒後重試`;
-                    break;
-                case 'disconnected':
-                default:
-                    badge.classList.add('bg-danger');
-                    statusText.textContent = '未連接';
-                    reconnectInfo.textContent = isManualDisconnect ? '已手動斷線' : '連線中斷';
-                    break;
+            if (connected) {
+                badge.className = 'badge status-badge bg-success';
+                text.textContent = '已連接';
+            } else {
+                badge.className = 'badge status-badge bg-danger';
+                text.textContent = '未連接';
             }
         }
 
-        // ===== 訊息處理 =====
-
-        function handleMessage(data) {
-            console.log('📨 收到訊息:', data);
-            
-            // 完整系統狀態
-            if (data.type === 'systemStateUpdate') {
-                applySystemState(data.state);
-                updateLastUpdate();
-            }
-            
-            // 模式更新
-            if (data.type === 'modeUpdate') {
-                updateContentMode(data.mode);
-                updateLastUpdate();
-            }
-            
-            // Surface 狀態更新
-            if (data.type === 'madmapperStatusUpdate') {
-                surfaceStates[data.surface] = data.enabled;
-                updateSurfaceUI(data.surface, data.enabled);
-                updateLastUpdate();
-            }
-            
-            // Mask 模式更新
-            if (data.type === 'maskStatusUpdate') {
-                updateMaskModeUI(data.maskId);
-                updateLastUpdate();
-            }
-            
-            // 自動循環狀態更新
-            if (data.type === 'autoCycleUpdate') {
-                updateAutoCycleState(data);
+        // 內容模式切換
+        function switchContentMode(mode) {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'switchMode',
+                    mode: mode,
+                    manual: true // 標記為手動切換
+                }));
+                // 移除立即更新 UI，等待伺服器廣播
+                // updateContentMode(mode);
+            } else {
+                alert('未連接到伺服器!');
             }
         }
-
-        // ===== UI 更新 =====
 
         function updateContentMode(mode) {
-            currentMode = mode;
+            currentContentMode = mode;
+            let name = document.getElementById(`content${mode}`).name;
+            document.getElementById('currentContentMode').textContent = name;
             
-            // 更新按鈕狀態
-            document.querySelectorAll('.mode-btn').forEach(btn => {
-                btn.classList.remove('active');
+            // 更新按鈕樣式
+            const btns = document.getElementsByClassName('mode-btn');
+            Array.from(btns).forEach(btn => {
+                let i = parseInt(btn.id.slice(7));
+                if (btn) btn.className = (i === mode) ? 'btn btn-primary mode-btn w-100 active' : 'btn btn-outline-secondary mode-btn w-100';
             });
-            const activeBtn = document.querySelector(`.mode-btn:nth-child(${mode})`);
-            if (activeBtn) {
-                activeBtn.parentElement.querySelector('.mode-btn').classList.add('active');
-            }
-            
-            document.getElementById('currentContentMode').textContent = modeNames[mode] || `模式 ${mode}`;
-        }
 
-        function updateMaskModeUI(maskId) {
-            currentMaskMode = maskId;
-            
-            // 更新按鈕狀態
-            document.querySelectorAll('.mask-mode-btn').forEach(btn => {
-                btn.classList.remove('active');
-            });
-            
-            if (maskId === 1) {
-                document.querySelector('.mask-mode-btn:first-child').classList.add('active');
-                document.getElementById('currentMaskMode').textContent = 'Quad-1~8';
-            } else if (maskId === 2) {
-                document.querySelector('.mask-mode-btn:last-child').classList.add('active');
-                document.getElementById('currentMaskMode').textContent = 'Quad-9~16';
+            // 控制分割面板是否可用
+            const panel = document.getElementById('tableControlPanel');
+            const hint = document.getElementById('splitModeHint');
+            if (mode === 8) {
+                panel.classList.remove('disabled-section');
+                hint.style.display = 'none';
+            } else {
+                panel.classList.add('disabled-section');
+                hint.style.display = 'block';
             }
         }
 
-        function updateSurfaceUI(surfaceName, enabled) {
-            const element = document.querySelector(`[data-surface="${surfaceName}"]`);
-            if (element) {
-                if (enabled) {
-                    element.classList.add('active');
-                    element.querySelector('.surface-status').textContent = '已開啟';
-                } else {
-                    element.classList.remove('active');
-                    element.querySelector('.surface-status').textContent = '已關閉';
+        // 更新下拉選單 UI
+        function updateTableUI(modes) {
+            if (!modes) return;
+            modes.forEach((activeMode, tableIdx) => {
+                const group = document.getElementById(`table-group-${tableIdx}`);
+                if (group) {
+                    const btns = group.querySelectorAll('.table-btn');
+                    btns.forEach(btn => {
+                        const btnVal = parseInt(btn.getAttribute('data-val'));
+                        if (btnVal === activeMode) {
+                            btn.classList.add('active');
+                        } else {
+                            btn.classList.remove('active');
+                        }
+                    });
                 }
-            }
+            });
         }
 
-        // ===== 控制功能 =====
-
-        function setMode(mode) {
-            if (!ws || ws.readyState !== WebSocket.OPEN) {
+        // Mask 模式切換
+        function switchMaskMode(mode) {
+            if (ws && ws.readyState !== WebSocket.OPEN) {
                 alert('未連接到伺服器!');
                 return;
             }
-            
-            ws.send(JSON.stringify({
-                type: 'modeChange',
-                mode: mode
-            }));
-        }
 
-        function setMaskMode(maskId) {
-            if (!ws || ws.readyState !== WebSocket.OPEN) {
-                alert('未連接到伺服器!');
-                return;
-            }
+            currentMaskMode = mode;
             
+            // 發送 maskId 到 ObjectTracker
             ws.send(JSON.stringify({
                 type: 'maskControl',
-                maskId: maskId
+                maskId: mode
             }));
-        }
-
-        function toggleSurface(surfaceName, forceState = null) {
-            if (!ws || ws.readyState !== WebSocket.OPEN) {
-                alert('未連接到伺服器!');
-                return;
-            }
             
-            const currentState = surfaceStates[surfaceName] || false;
-            const newState = forceState !== null ? forceState : !currentState;
-            
-            ws.send(JSON.stringify({
-                type: 'madmapperControl',
-                surface: surfaceName,
-                enabled: newState
-            }));
-        }
+            console.log(`切換到桌面模式 ${mode},已發送 maskId: ${mode}`);
 
-        // ===== Surface 網格初始化 =====
+            // 更新 UI
+            updateMaskModeUI(mode);
 
-        function initSurfaceGrids() {
-            // 初始化兩個模式的 Surface 網格
-            [1, 2].forEach(mode => {
-                const grid = document.getElementById(`surfaceGrid${mode}`);
-                grid.innerHTML = '';
-                
-                surfacesSettings[mode].forEach(surface => {
-                    // 初始化狀態
-                    surfaceStates[surface.SurfaceName] = false;
-                    
-                    const div = document.createElement('div');
-                    div.className = 'surface-toggle';
-                    div.dataset.surface = surface.SurfaceName;
-                    div.onclick = () => toggleSurface(surface.SurfaceName);
-                    
-                    div.innerHTML = `
-                        <div class="surface-name">${surface.ShowName}</div>
-                        <div class="surface-status">已關閉</div>
-                    `;
-                    
-                    grid.appendChild(div);
+            // 根據模式開啟對應的 Surfaces,關閉另一組
+            if (mode === 1) {
+                surfacesSettings[1].forEach(surface => {
+                    toggleSurface(surface.SurfaceName, true);
                 });
-            });
+                surfacesSettings[2].forEach(surface => {
+                    toggleSurface(surface.SurfaceName, false);
+                });
+            } else {
+                surfacesSettings[1].forEach(surface => {
+                    toggleSurface(surface.SurfaceName, false);
+                });
+                surfacesSettings[2].forEach(surface => {
+                    toggleSurface(surface.SurfaceName, true);
+                });
+            }
+        }
+
+        // 更新 Mask 模式 UI
+        function updateMaskModeUI(mode) {
+            currentMaskMode = mode;
+            document.getElementById('currentMaskMode').textContent = mode == 1? '合併' : '分散';
+
+            // 更新模式按鈕樣式
+            document.getElementById('mask1').className = mode === 1 ? 
+                'btn btn-primary mask-mode-btn w-100 active' : 
+                'btn btn-outline-primary mask-mode-btn w-100';
+            document.getElementById('mask2').className = mode === 2 ? 
+                'btn btn-primary mask-mode-btn w-100 active' : 
+                'btn btn-outline-primary mask-mode-btn w-100';
+
+            // 切換 Surface 控制區域顯示
+            document.getElementById('surfacesMode1').className = mode === 1 ? 'card' : 'card section-hidden';
+            document.getElementById('surfacesMode2').className = mode === 2 ? 'card' : 'card section-hidden';
+        }
+
+        // 單一 Surface 切換
+        function toggleSingleSurface(surfaceName) {
+            const surfaceDiv = document.getElementById(`surface-${surfaceName}`);
+            const isActive = surfaceDiv.classList.contains('active');
+            const newState = !isActive;
+            toggleSurface(surfaceName, newState);
+        }
+
+        // 切換 Surface 狀態
+        function toggleSurface(surfaceName, enabled) {
+            // 更新本地狀態
+            surfaceStates[surfaceName] = enabled;
+
+            // 更新 UI
+            updateSurfaceUI(surfaceName, enabled);
+
+            // 發送 OSC 到 MadMapper
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'madmapperControl',
+                    surface: surfaceName,
+                    enabled: enabled
+                }));
+            }
+        }
+
+        // 更新 Surface UI
+        function updateSurfaceUI(surfaceName, enabled) {
+            const surfaceDiv = document.getElementById(`surface-${surfaceName}`);
+            const statusDiv = document.getElementById(`status-${surfaceName}`);
+
+            if (surfaceDiv && statusDiv) {
+                if (enabled) {
+                    surfaceDiv.classList.add('active');
+                    statusDiv.textContent = '開啟';
+                } else {
+                    surfaceDiv.classList.remove('active');
+                    statusDiv.textContent = '關閉';
+                }
+            }
         }
 
         // 應用完整系統狀態(從伺服器載入)
@@ -767,11 +820,15 @@
                     });
                 }
             }
+
+            // 應用桌子狀態
+            if (state.tableModes) {
+                updateTableUI(state.tableModes);
+            }
             
-            console.log('✅ 系統狀態已同步');
-            console.log(`   - 內容模式: ${state.contentMode}`);
-            console.log(`   - 桌面模式: ${state.maskMode}`);
-            console.log(`   - Surface 狀態: ${Object.keys(state.surfaceStates || {}).length} 個`);
+            console.log('系統狀態已應用');
+            console.log(`- 內容模式: ${state.contentMode}`);
+            console.log(`- 桌面模式: ${state.maskMode}`);
         }
 
         // 批次切換當前模式的所有 Surfaces
@@ -787,8 +844,74 @@
             document.getElementById('lastUpdate').textContent = timeStr;
         }
 
-        // ===== 自動循環功能 =====
 
+        //#endregion
+
+        // WebSocket 連接
+        function connect() {
+            ws = new WebSocket(wsUrl);
+            
+            ws.onopen = () => {
+                console.log('WebSocket 已連接');
+                updateStatus(true);
+                
+                // 告知伺服器這是網頁客戶端
+                ws.send(JSON.stringify({
+                    clientType: 'web'
+                }));
+            };
+
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                
+                // 接收完整系統狀態
+                if (data.type === 'systemStateUpdate') {
+                    applySystemState(data.state);
+                }
+
+                // 接收模式更新
+                if (data.type === 'modeUpdate') {
+                    updateContentMode(data.mode);
+                }
+
+                // 接收其他客戶端的模式更新
+                if (data.type === 'modeStatusUpdate') {
+                    updateContentMode(data.mode);
+                }
+
+                // 接收 MadMapper 狀態更新
+                if (data.type === 'madmapperStatusUpdate') {
+                    surfaceStates[data.surface] = data.enabled;
+                    updateSurfaceUI(data.surface, data.enabled);
+                }
+
+                // 接收其他客戶端的 Mask 狀態更新
+                if (data.type === 'maskStatusUpdate') {
+                    updateMaskModeUI(data.maskId);
+                }
+
+                // 接收自動循環狀態更新
+                if (data.type === 'autoCycleUpdate') {
+                    updateAutoCycleState(data);
+                }
+                
+                updateLastUpdate();
+            };
+
+            ws.onclose = () => {
+                updateStatus(false);
+                console.log('WebSocket 已斷線,5秒後重連...');
+                setTimeout(connect, 5000);
+            };
+
+            ws.onerror = (error) => {
+                console.error('WebSocket 錯誤:', error);
+            };
+        }
+        
+        //#region auto cycle
+
+        // 啟用/停用自動循環
         function toggleAutoCycle() {
             if (!ws || ws.readyState !== WebSocket.OPEN) {
                 alert('未連接到伺服器!');
@@ -814,6 +937,7 @@
             updateAutoCycleUI();
         }
 
+        // 更新自動循環狀態（來自伺服器）
         function updateAutoCycleState(data) {
             autoCycleEnabled = data.enabled;
             
@@ -824,6 +948,7 @@
             updateAutoCycleUI();
         }
 
+        // 更新自動循環 UI
         function updateAutoCycleUI() {
             const statusDiv = document.getElementById('autoCycleStatus');
             const statusText = document.getElementById('cycleStatusText');
@@ -852,6 +977,7 @@
             }
         }
 
+        // 更新計時器顯示
         function updateTimerDisplay() {
             if (remainingSeconds > 0) {
                 remainingSeconds--;
@@ -862,6 +988,7 @@
             }
         }
 
+        // 渲染循環模式列表
         function renderCycleModesList() {
             const container = document.getElementById('cycleModesContainer');
             container.innerHTML = '';
@@ -899,6 +1026,7 @@
             });
         }
 
+        // 更新循環模式順序
         function updateCycleModesOrder() {
             const container = document.getElementById('cycleModesContainer');
             const items = container.querySelectorAll('.mode-list-item');
@@ -909,6 +1037,7 @@
             renderCycleModesList();
         }
 
+        // 新增模式到列表
         function addModeToList() {
             const select = document.getElementById('newModeSelect');
             const modeId = parseInt(select.value);
@@ -923,12 +1052,14 @@
             renderCycleModesList();
         }
 
+        // 從列表移除模式
         function removeModeFromList(modeId) {
             cycleModes = cycleModes.filter(id => id !== modeId);
             saveCycleSettings();
             renderCycleModesList();
         }
 
+        // 儲存循環設定到伺服器
         function saveCycleSettings() {
             if (!ws || ws.readyState !== WebSocket.OPEN) return;
 
@@ -941,29 +1072,19 @@
             }));
         }
 
+        //#endregion
+
         // 監聽循環時間輸入變更
         document.getElementById('cycleInterval').addEventListener('change', function() {
             saveCycleSettings();
         });
 
-        // ===== 頁面載入時初始化 =====
-
-        // 當頁面關閉或刷新時優雅地斷線
-        window.addEventListener('beforeunload', () => {
-            isManualDisconnect = true;
-            if (ws) {
-                ws.close();
-            }
-        });
-
         // 初始化
         document.getElementById('serverUrl').textContent = serverUrl;
         initSurfaceGrids();
+        initTableControls();
         renderCycleModesList();
         connect();
-
-        console.log('🎮 LE ROOM 控制台已啟動');
-        console.log('📡 伺服器位址:', serverUrl);
     </script>
 </body>
 </html>
