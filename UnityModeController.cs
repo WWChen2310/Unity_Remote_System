@@ -1,82 +1,96 @@
-// UnityModeController.cs
 using UnityEngine;
 using System;
+using System.Collections.Concurrent; // [新增] 用於執行緒安全的 Queue
 using System.Collections.Generic;
 using NativeWebSocket;
+using System.Threading.Tasks;
 
 public class UnityModeController : MonoBehaviour
 {
     [Header("伺服器設定")]
-    [SerializeField] private string serverUrl = "ws://192.168.1.100:3000";
+    [SerializeField] private string serverUrl = "ws://192.168.0.201:3000"; // 請確認 IP
     
-    [Header("當前模式")]
+    [Header("當前狀態")]
     [SerializeField] private int currentMode = 1;
-    
+    // [新功能] 8個桌子的模式
+    [SerializeField] private int[] currentTableModes = new int[8];
+
     private WebSocket websocket;
-    private Queue<Action> mainThreadActions = new Queue<Action>();
+    // [修改] 改用 ConcurrentQueue 以確保執行緒安全
+    private ConcurrentQueue<Action> mainThreadActions = new ConcurrentQueue<Action>();
+    private bool isReconnecting = false;
 
     async void Start()
     {
         await ConnectWebSocket();
     }
 
-    async System.Threading.Tasks.Task ConnectWebSocket()
+    async Task ConnectWebSocket()
     {
-        try
+        if (websocket != null)
         {
-            websocket = new WebSocket(serverUrl);
-
-            websocket.OnOpen += () =>
-            {
-                Debug.Log("✅ WebSocket 已連接");
-                EnqueueMainThreadAction(() =>
-                {
-                    // 識別為 Unity 客戶端
-                    SendMessage(new { clientType = "unity", version = Application.version });
-                    // 連接後請求當前模式
-                    SendMessage(new { type = "getMode" });
-                });
-            };
-
-            websocket.OnMessage += (bytes) =>
-            {
-                string message = System.Text.Encoding.UTF8.GetString(bytes);
-                Debug.Log($"📨 收到訊息: {message}");
-                
-                EnqueueMainThreadAction(() =>
-                {
-                    HandleMessage(message);
-                });
-            };
-
-            websocket.OnError += (errorMsg) =>
-            {
-                Debug.LogError($"❌ WebSocket 錯誤: {errorMsg}");
-            };
-
-            websocket.OnClose += (closeCode) =>
-            {
-                Debug.Log($"❌ WebSocket 已斷線: {closeCode}");
-                EnqueueMainThreadAction(() =>
-                {
-                    // 5 秒後重新連接
-                    Invoke(nameof(ReconnectWebSocket), 5f);
-                });
-            };
-
-            await websocket.Connect();
+            // 清理舊連線
+            try { await websocket.Close(); } catch { }
         }
-        catch (Exception e)
+
+        websocket = new WebSocket(serverUrl);
+
+        websocket.OnOpen += () =>
         {
-            Debug.LogError($"❌ 連接失敗: {e.Message}");
-            Invoke(nameof(ReconnectWebSocket), 5f);
+            Debug.Log("✅ WebSocket 已連接");
+            isReconnecting = false;
+            EnqueueMainThreadAction(() =>
+            {
+                // 發送識別與同步請求
+                SendMessage(new { clientType = "unity", type = "unitySync" });
+            });
+        };
+
+        websocket.OnMessage += (bytes) =>
+        {
+            string message = System.Text.Encoding.UTF8.GetString(bytes);
+            EnqueueMainThreadAction(() => HandleMessage(message));
+        };
+
+        websocket.OnClose += (e) =>
+        {
+            Debug.Log($"❌ WebSocket 斷線: {e}");
+            if (!isReconnecting) ReconnectLoop();
+        };
+
+        websocket.OnError += (e) =>
+        {
+            Debug.LogError($"❌ WebSocket 錯誤: {e}");
+            if (!isReconnecting) ReconnectLoop();
+        };
+
+        try {
+            await websocket.Connect();
+        } catch (Exception ex) {
+            Debug.LogError($"連線例外: {ex.Message}");
+            if (!isReconnecting) ReconnectLoop();
         }
     }
 
-    async void ReconnectWebSocket()
+    // [強韌性] 無限重連迴圈
+    async void ReconnectLoop()
     {
-        Debug.Log("🔄 嘗試重新連接...");
-        await ConnectWebSocket();
+        isReconnecting = true;
+        while (isReconnecting)
+        {
+            Debug.Log("🔄 5秒後嘗試重連...");
+            await Task.Delay(5000);
+            
+            // 如果物件已被銷毀(停止播放)，停止重連
+            if (this == null) return; 
+
+            try {
+                await ConnectWebSocket();
+                // 如果 ConnectWebSocket 成功 (跑到 OnOpen)，isReconnecting 會變成 false，迴圈結束
+            } catch { 
+                // 失敗則繼續迴圈
+            }
+        }
     }
 
     void HandleMessage(string message)
@@ -84,118 +98,115 @@ public class UnityModeController : MonoBehaviour
         try
         {
             var data = JsonUtility.FromJson<MessageData>(message);
-            
-            if (data.type == "modeUpdate")
+
+            // 1. 系統完整狀態同步 (連線初期)
+            if (data.type == "systemStateUpdate" && data.state != null)
             {
-                SwitchToMode(data.mode);
+                UpdateLocalState(data.state.contentMode, data.state.tableModes);
+            }
+            // 2. 模式切換 (一般切換或自動循環)
+            else if (data.type == "modeUpdate")
+            {
+                UpdateLocalState(data.mode, data.tableModes);
+            }
+            // 3. [新功能] 僅桌子狀態更新
+            else if (data.type == "tableModeUpdate")
+            {
+                UpdateLocalState(currentMode, data.tableModes);
             }
         }
         catch (Exception e)
         {
-            Debug.LogError($"❌ 解析訊息失敗: {e.Message}");
+            Debug.LogError($"JSON 解析失敗: {e.Message}");
+        }
+    }
+
+    void UpdateLocalState(int newMode, int[] newTableModes)
+    {
+        // 更新桌子資料
+        if (newTableModes != null && newTableModes.Length == 8)
+        {
+            Array.Copy(newTableModes, currentTableModes, 8);
+        }
+
+        bool modeChanged = (currentMode != newMode);
+        currentMode = newMode;
+
+        if (modeChanged)
+        {
+            SwitchToMode(currentMode);
+        }
+        
+        // 如果是在模式 8，且收到桌子更新，即使主模式沒變也要刷新
+        if (currentMode == 8)
+        {
+            ApplyMode8();
         }
     }
 
     void SwitchToMode(int mode)
     {
-        if (currentMode == mode) return;
-        
-        currentMode = mode;
-        Debug.Log($"🔄 切換至模式: {mode}");
-        
-        // 在這裡實作你的模式切換邏輯
+        Debug.Log($"🎬 切換至主模式: {mode}");
         switch (mode)
         {
-            case 1:
-                ApplyMode1();
-                break;
-            case 2:
-                ApplyMode2();
-                break;
-            case 3:
-                ApplyMode3();
-                break;
-            case 4:
-                ApplyMode4();
-                break;
+            case 1: ApplyMode1(); break;
+            case 2: ApplyMode2(); break;
+            case 3: ApplyMode3(); break;
+            case 4: ApplyMode4(); break;
+            case 8: ApplyMode8(); break; // [新功能]
+            default: Debug.LogWarning($"未定義的模式: {mode}"); break;
         }
     }
 
-    // 實作各個模式的邏輯
-    void ApplyMode1()
-    {
-        Debug.Log("🌅 應用模式 1");
-        // 例如：切換場景、改變渲染設定、調整後處理效果等
-        // RenderSettings.skybox = mode1Skybox;
-        // Volume volume = FindObjectOfType<Volume>();
-        // if (volume.profile.TryGet<ColorAdjustments>(out var colorAdjustments))
-        // {
-        //     colorAdjustments.saturation.value = 0f;
-        // }
-    }
+    void ApplyMode1() { /* 原有邏輯 */ }
+    void ApplyMode2() { /* 原有邏輯 */ }
+    void ApplyMode3() { /* 原有邏輯 */ }
+    void ApplyMode4() { /* 原有邏輯 */ }
 
-    void ApplyMode2()
+    // [新功能] 分割內容模式實作
+    void ApplyMode8()
     {
-        Debug.Log("🌆 應用模式 2");
-        // 你的模式 2 邏輯
-    }
-
-    void ApplyMode3()
-    {
-        Debug.Log("🌃 應用模式 3");
-        // 你的模式 3 邏輯
-    }
-
-    void ApplyMode4()
-    {
-        Debug.Log("🌌 應用模式 4");
-        // 你的模式 4 邏輯
+        Debug.Log("🪟 應用分割內容模式");
+        for (int i = 0; i < 8; i++)
+        {
+            int tableMode = currentTableModes[i];
+            // Debug.Log($"   - 桌子 {i+1}: 模式 {tableMode}");
+            // TODO: 在這裡實作您的畫面邏輯
+        }
     }
 
     async void SendMessage(object data)
     {
-        if (websocket.State == WebSocketState.Open)
+        if (websocket != null && websocket.State == WebSocketState.Open)
         {
             string json = JsonUtility.ToJson(data);
             await websocket.SendText(json);
         }
     }
 
-    void Update()
-    {
-        #if !UNITY_WEBGL || UNITY_EDITOR
-        if (websocket != null)
-        {
-            websocket.DispatchMessageQueue();
-        }
-        #endif
-
-        // 執行主執行緒的動作
-        while (mainThreadActions.Count > 0)
-        {
-            mainThreadActions.Dequeue()?.Invoke();
-        }
-    }
-
+    // [補回遺失的函式] 將動作排入主執行緒佇列
     void EnqueueMainThreadAction(Action action)
     {
         mainThreadActions.Enqueue(action);
     }
 
-    async void OnApplicationQuit()
+    void Update()
     {
-        if (websocket != null)
+        #if !UNITY_WEBGL || UNITY_EDITOR
+        if (websocket != null) websocket.DispatchMessageQueue();
+        #endif
+
+        // [修改] 使用 ConcurrentQueue 的 TryDequeue
+        while (mainThreadActions.TryDequeue(out var action))
         {
-            await websocket.Close();
+            action?.Invoke();
         }
     }
 
     async void OnDestroy()
     {
-        if (websocket != null)
-        {
-            await websocket.Close();
-        }
+        isReconnecting = false;
+        if (websocket != null) await websocket.Close();
     }
 
     // JSON 資料結構
@@ -204,5 +215,15 @@ public class UnityModeController : MonoBehaviour
     {
         public string type;
         public int mode;
+        public int[] tableModes;
+        public SystemState state;
+    }
+
+    [Serializable]
+    private class SystemState
+    {
+        public int contentMode;
+        public int maskMode;
+        public int[] tableModes;
     }
 }
