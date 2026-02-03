@@ -787,7 +787,7 @@
         // 應用完整系統狀態(從伺服器載入)
         function applySystemState(state) {
             // 應用內容模式
-            if (state.contentMode) {
+            if (state.contentMode !== undefined) {
                 updateContentMode(state.contentMode);
             }
             
