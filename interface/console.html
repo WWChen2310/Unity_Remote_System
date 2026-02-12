@@ -256,10 +256,10 @@
                         <small class="text-muted">內容模式</small>
                         <h6 class="mb-0 mt-1" id="currentContentMode">未知</h6>
                     </div>
-                    <div class="col-6">
+                    <!-- <div class="col-6">
                         <small class="text-muted">桌面模式</small>
                         <h6 class="mb-0 mt-1" id="currentMaskMode">未知</h6>
-                    </div>
+                    </div> -->
                 </div>
             </div>
         </div>
@@ -321,7 +321,7 @@
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <h6 class="card-subtitle text-muted mb-0">
-                        <i class="bi bi-layout-split"></i> 桌面個別控制
+                        <i class="bi bi-layout-split"></i> 座位個別控制
                     </h6>
                     <small class="text-danger" id="splitModeHint" style="display:none;">(僅在分割內容模式下可用)</small>
                 </div>
@@ -353,34 +353,11 @@
             </div>
         </div>
 
-        <!-- 桌面模式切換 -->
-        <div class="card">
-            <div class="card-body">
-                <h6 class="card-subtitle mb-3 text-muted">
-                    <i class="bi bi-projector"></i> 桌面模式
-                </h6>
-                <div class="row g-3">
-                    <div class="col-6">
-                        <button class="btn btn-outline-primary mask-mode-btn w-100" onclick="switchMaskMode(1)" id="mask1">
-                            <i class="bi bi-grid-3x3"></i>
-                            <div>合併</div>
-                        </button>
-                    </div>
-                    <div class="col-6">
-                        <button class="btn btn-outline-primary mask-mode-btn w-100" onclick="switchMaskMode(2)" id="mask2">
-                            <i class="bi bi-grid-3x3-gap"></i>
-                            <div>分散</div>
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
         <!-- Surface 控制 - 模式一 -->
         <div class="card" id="surfacesMode1">
             <div class="card-body">
                 <h6 class="card-subtitle mb-3 text-muted">
-                    <i class="bi bi-grid"></i> 區域控制 - 合併
+                    <i class="bi bi-grid"></i> 區域開關
                 </h6>
                 <div class="surface-grid" id="surfaceGridMode1">
                     <!-- 由 JS 動態生成 -->
@@ -466,6 +443,7 @@
                                     <option value="3">森林 (ID: 3)</option>
                                     <option value="4">稻田 (ID: 4)</option>
                                     <option value="5">水草 (ID: 5)</option>
+                                    <option value="8">分割內容 (ID: 8)</option>
                                     <!-- <option value="7">萬聖節 (ID: 7)</option> -->
                                 </select>
                             </div>
@@ -507,7 +485,7 @@
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     <script>
         //#region settings
-        const serverUrl = '10.0.1.251';
+        const serverUrl = '192.168.0.201';
         const wsUrl = `ws://${serverUrl}:3000`;
         
         let ws = null;
@@ -531,14 +509,15 @@
             4: '稻田',
             5: '水草',
             6: '全白畫面',
-            7: '萬聖節'
+            7: '萬聖節',
+            8: '分割內容'
         };
 
         // Surface 設定（與伺服器保持一致）
         const surfacesSettings = {
             1: [
                 { SurfaceName: 'Main-1', ShowName: 'Main' },
-                { SurfaceName: 'T1-1', ShowName: 'T1' },
+                // { SurfaceName: 'T1-1', ShowName: 'T1' },
                 { SurfaceName: 'T2-1', ShowName: 'T2' },
                 { SurfaceName: 'T3-1', ShowName: 'T3' },
                 { SurfaceName: 'T4-1', ShowName: 'T4' },
@@ -603,12 +582,12 @@
                 const div = document.createElement('div');
                 div.className = 'table-control-item';
                 div.innerHTML = `
-                    <label class="table-control-label">桌面 ${i + 1}</label>
+                    <label class="table-control-label">座位 ${i + 1}</label>
                     <div class="table-btn-group" id="table-group-${i}">
-                        <button class="table-btn" onclick="updateTableMode(${i}, 0)" data-val="0">模式 0</button>
-                        <button class="table-btn" onclick="updateTableMode(${i}, 1)" data-val="1">模式 1</button>
-                        <button class="table-btn" onclick="updateTableMode(${i}, 2)" data-val="2">模式 2</button>
-                        <button class="table-btn" onclick="updateTableMode(${i}, 3)" data-val="3">模式 3</button>
+                        <button class="table-btn" onclick="updateTableMode(${i}, 0)" data-val="0">預設</button>
+                        <button class="table-btn" onclick="updateTableMode(${i}, 1)" data-val="1">海洋</button>
+                        <button class="table-btn" onclick="updateTableMode(${i}, 2)" data-val="2">森林</button>
+                        <button class="table-btn" onclick="updateTableMode(${i}, 3)" data-val="3">液態食物</button>
                     </div>
                 `;
                 container.appendChild(div);
@@ -718,7 +697,7 @@
             console.log(`切換到桌面模式 ${mode},已發送 maskId: ${mode}`);
 
             // 更新 UI
-            updateMaskModeUI(mode);
+            // updateMaskModeUI(mode);
 
             // 根據模式開啟對應的 Surfaces,關閉另一組
             if (mode === 1) {
@@ -739,22 +718,14 @@
         }
 
         // 更新 Mask 模式 UI
-        function updateMaskModeUI(mode) {
-            currentMaskMode = mode;
-            document.getElementById('currentMaskMode').textContent = mode == 1? '合併' : '分散';
+        // function updateMaskModeUI(mode) {
+        //     currentMaskMode = mode;
+        //     // document.getElementById('currentMaskMode').textContent = mode == 1? '合併' : '分散';
 
-            // 更新模式按鈕樣式
-            document.getElementById('mask1').className = mode === 1 ? 
-                'btn btn-primary mask-mode-btn w-100 active' : 
-                'btn btn-outline-primary mask-mode-btn w-100';
-            document.getElementById('mask2').className = mode === 2 ? 
-                'btn btn-primary mask-mode-btn w-100 active' : 
-                'btn btn-outline-primary mask-mode-btn w-100';
-
-            // 切換 Surface 控制區域顯示
-            document.getElementById('surfacesMode1').className = mode === 1 ? 'card' : 'card section-hidden';
-            document.getElementById('surfacesMode2').className = mode === 2 ? 'card' : 'card section-hidden';
-        }
+        //     // 切換 Surface 控制區域顯示
+        //     document.getElementById('surfacesMode1').className = mode === 1 ? 'card' : 'card section-hidden';
+        //     document.getElementById('surfacesMode2').className = mode === 2 ? 'card' : 'card section-hidden';
+        // }
 
         // 單一 Surface 切換
         function toggleSingleSurface(surfaceName) {
@@ -806,9 +777,9 @@
             }
             
             // 應用桌面模式(不發送 OSC,只更新 UI)
-            if (state.maskMode) {
-                updateMaskModeUI(state.maskMode);
-            }
+            // if (state.maskMode) {
+            //     updateMaskModeUI(state.maskMode);
+            // }
             
             // 應用 Surface 狀態(不發送 OSC,只更新 UI)
             if (state.surfaceStates) {
@@ -842,7 +813,7 @@
             
             console.log('系統狀態已應用');
             console.log(`- 內容模式: ${state.contentMode}`);
-            console.log(`- 桌面模式: ${state.maskMode}`);
+            // console.log(`- 桌面模式: ${state.maskMode}`);
         }
 
         // 批次切換當前模式的所有 Surfaces
@@ -910,9 +881,9 @@
                 }
 
                 // 接收其他客戶端的 Mask 狀態更新
-                if (data.type === 'maskStatusUpdate') {
-                    updateMaskModeUI(data.maskId);
-                }
+                // if (data.type === 'maskStatusUpdate') {
+                //     updateMaskModeUI(data.maskId);
+                // }
 
                 // 接收自動循環狀態更新
                 if (data.type === 'autoCycleUpdate') {
