@@ -178,25 +178,44 @@
             filter: grayscale(100%);
         }
         .table-control-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr); /* 4列 */
-            gap: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .table-control-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+        }
+        .table-control-label {
+            min-width: 60px;
+            font-weight: 600;
+            font-size: 0.95rem;
+            color: #495057;
         }
         .table-btn-group {
             display: flex;
-            gap: 2px;
-            margin-top: 5px;
+            gap: 8px;
+            flex: 1;
         }
         .table-btn {
             flex: 1;
-            padding: 6px 0;
-            font-size: 11px;
-            border: 1px solid #dee2e6;
-            background-color: #f8f9fa;
+            padding: 10px 0;
+            font-size: 14px;
+            border: 2px solid #dee2e6;
+            background-color: white;
             color: #6c757d;
-            border-radius: 4px;
-            transition: all 0.15s ease;
+            border-radius: 6px;
+            transition: all 0.2s ease;
             font-weight: bold;
+            cursor: pointer;
+        }
+        .table-btn:hover {
+            border-color: #0d6efd;
+            background-color: #f8f9fa;
         }
         .table-btn.active {
             background-color: #0d6efd !important;
@@ -211,11 +230,6 @@
         }
         .table-btn:active {
             transform: translateY(1px);
-        }
-        @media (max-width: 500px) {
-            .table-control-grid {
-                grid-template-columns: repeat(2, 1fr); /* 手機版2列 */
-            }
         }
     </style>
 </head>
@@ -587,14 +601,14 @@
             
             for (let i = 0; i < 8; i++) {
                 const div = document.createElement('div');
-                div.className = 'p-2 border rounded bg-white shadow-sm';
+                div.className = 'table-control-item';
                 div.innerHTML = `
-                    <label class="form-label small fw-bold mb-1 d-block text-center text-secondary">桌面 ${i + 1}</label>
+                    <label class="table-control-label">桌面 ${i + 1}</label>
                     <div class="table-btn-group" id="table-group-${i}">
-                        <button class="table-btn" onclick="updateTableMode(${i}, 0)" data-val="0">0</button>
-                        <button class="table-btn" onclick="updateTableMode(${i}, 1)" data-val="1">1</button>
-                        <button class="table-btn" onclick="updateTableMode(${i}, 2)" data-val="2">2</button>
-                        <button class="table-btn" onclick="updateTableMode(${i}, 3)" data-val="3">3</button>
+                        <button class="table-btn" onclick="updateTableMode(${i}, 0)" data-val="0">模式 0</button>
+                        <button class="table-btn" onclick="updateTableMode(${i}, 1)" data-val="1">模式 1</button>
+                        <button class="table-btn" onclick="updateTableMode(${i}, 2)" data-val="2">模式 2</button>
+                        <button class="table-btn" onclick="updateTableMode(${i}, 3)" data-val="3">模式 3</button>
                     </div>
                 `;
                 container.appendChild(div);
@@ -872,11 +886,21 @@
                 // 接收模式更新
                 if (data.type === 'modeUpdate') {
                     updateContentMode(data.mode);
+                    // 如果有桌面模式狀態，同步更新
+                    if (data.tableModes) {
+                        updateTableUI(data.tableModes);
+                    }
                 }
 
                 // 接收其他客戶端的模式更新
                 if (data.type === 'modeStatusUpdate') {
                     updateContentMode(data.mode);
+                }
+
+                // [新增] 接收桌面個別控制的更新
+                if (data.type === 'tableModeUpdate') {
+                    console.log('收到桌面模式更新:', data.tableModes);
+                    updateTableUI(data.tableModes);
                 }
 
                 // 接收 MadMapper 狀態更新
