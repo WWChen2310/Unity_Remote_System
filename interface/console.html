@@ -583,11 +583,11 @@
                 div.className = 'table-control-item';
                 div.innerHTML = `
                     <label class="table-control-label">座位 ${i + 1}</label>
-                    <div class="table-btn-group" id="table-group-${i}">
-                        <button class="table-btn" onclick="updateTableMode(${i}, 0)" data-val="0">預設</button>
-                        <button class="table-btn" onclick="updateTableMode(${i}, 1)" data-val="1">海洋</button>
-                        <button class="table-btn" onclick="updateTableMode(${i}, 2)" data-val="2">森林</button>
-                        <button class="table-btn" onclick="updateTableMode(${i}, 3)" data-val="3">液態食物</button>
+                    <div class="table-btn-group" id="table-group-${7-i}">
+                        <button class="table-btn" onclick="updateTableMode(${7-i}, 0)" data-val="0">預設</button>
+                        <button class="table-btn" onclick="updateTableMode(${7-i}, 1)" data-val="1">海洋</button>
+                        <button class="table-btn" onclick="updateTableMode(${7-i}, 2)" data-val="2">森林</button>
+                        <button class="table-btn" onclick="updateTableMode(${7-i}, 3)" data-val="3">液態食物</button>
                     </div>
                 `;
                 container.appendChild(div);

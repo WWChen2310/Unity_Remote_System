@@ -1,25 +1,25 @@
 {
   "contentMode": 8,
-  "maskMode": 2,
+  "maskMode": 1,
   "surfaceStates": {
-    "Main-1": false,
-    "T1-1": false,
-    "T2-1": false,
-    "T3-1": false,
-    "T4-1": false,
-    "T5-1": false,
-    "T6-1": false,
-    "T7-1": false,
-    "Main-2": true,
-    "T2-2": true,
-    "T3-2": true,
-    "T4-2": true,
-    "T5-2": true,
-    "T6-2": true,
-    "T7-2": true
+    "Main-1": true,
+    "T1-1": true,
+    "T2-1": true,
+    "T3-1": true,
+    "T4-1": true,
+    "T5-1": true,
+    "T6-1": true,
+    "T7-1": true,
+    "Main-2": false,
+    "T2-2": false,
+    "T3-2": false,
+    "T4-2": false,
+    "T5-2": false,
+    "T6-2": false,
+    "T7-2": false
   },
   "tableModes": [
-    1,
+    0,
     0,
     0,
     0,
@@ -40,5 +40,5 @@
     "currentIndex": 0,
     "remainingSeconds": 0
   },
-  "timestamp": "2026-02-02T11:02:00.669Z"
+  "timestamp": "2026-02-13T09:34:54.595Z"
 }
