@@ -57,52 +57,29 @@ ip addr show
 ## 📱 步驟 2：部署網頁介面
 
 ### 2.1 修改網頁代碼
-打開 HTML 檔案，修改第 190 行的伺服器位址：
+打開 `interface/console.html`，將 `serverUrl` 改成 WebSocket 伺服器的主機名稱或 IP（不要加 `ws://` 或連接埠）：
 
 ```javascript
-const serverUrl = 'ws://192.168.1.100:3000'; // 改成你的內網 IP
+const serverUrl = '192.168.1.100';
 ```
 
-### 2.2 部署選項
+### 2.2 部署必要檔案
 
-**選項 A：使用 Node.js 提供網頁（推薦）**
+網頁介面不是單一 HTML 檔案。部署時必須保持下列兩個檔案位於同一個目錄：
 
-建立 `web-server.js`：
-```javascript
-const http = require('http');
-const fs = require('fs');
-const path = require('path');
+- `interface/console.html`
+- `interface/control-settings.js`
 
-const PORT = 8080;
+### 2.3 靜態網站伺服器設定
 
-const server = http.createServer((req, res) => {
-    const filePath = path.join(__dirname, 'index.html');
-    fs.readFile(filePath, (err, content) => {
-        if (err) {
-            res.writeHead(500);
-            res.end('Error loading page');
-        } else {
-            res.writeHead(200, { 'Content-Type': 'text/html' });
-            res.end(content);
-        }
-    });
-});
+使用 IIS、Apache、Nginx 或其他靜態網站伺服器，並將專案的 `interface/` 目錄設為網站根目錄。設定必須符合以下條件：
 
-server.listen(PORT, '0.0.0.0', () => {
-    console.log(`🌐 網頁伺服器運行於 http://0.0.0.0:${PORT}`);
-});
-```
+- `/` 回傳 `console.html`。
+- `/control-settings.js` 回傳同目錄中的 `control-settings.js`，不可把找不到的路徑一律回傳 HTML。
+- `.html` 使用 `text/html`，`.js` 使用 `application/javascript`（或 `text/javascript`）。
+- 將要求的路徑正規化並限制在 `interface/` 根目錄內；包含 `..`、編碼後的 traversal 或解析後位於根目錄外的要求必須回傳 `403` 或 `404`。
 
-啟動：
-```bash
-node web-server.js
-```
-
-用手機瀏覽器開啟：`http://192.168.1.100:8080`
-
-**選項 B：使用任何 Web 伺服器**
-- IIS、Apache、Nginx 都可以
-- 只需將 HTML 放在網頁根目錄
+完成後可從 `http://192.168.1.100:8080/` 開啟控制台。瀏覽器開發者工具中，`/control-settings.js` 應回傳 JavaScript 與成功狀態碼。
 
 ---
 

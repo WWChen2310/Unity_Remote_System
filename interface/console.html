@@ -353,44 +353,22 @@
             </div>
         </div>
 
-        <!-- Surface 控制 - 模式一 -->
-        <div class="card" id="surfacesMode1">
+        <!-- Area 控制 -->
+        <div class="card" id="areaControls">
             <div class="card-body">
                 <h6 class="card-subtitle mb-3 text-muted">
-                    <i class="bi bi-grid"></i> 區域開關
+                    <i class="bi bi-grid"></i> 區域控制
                 </h6>
-                <div class="surface-grid" id="surfaceGridMode1">
+                <div class="surface-grid" id="areaControlGrid">
                     <!-- 由 JS 動態生成 -->
                 </div>
                 <div class="mt-3">
-                    <button class="btn btn-sm btn-outline-primary w-100" onclick="toggleAllSurfacesInMode(1, true)">
+                    <button class="btn btn-sm btn-outline-primary w-100" id="enableAllAreas" onclick="toggleAllSurfaces(true)">
                         <i class="bi bi-check-all"></i> 全部開啟
                     </button>
                 </div>
                 <div class="mt-2">
-                    <button class="btn btn-sm btn-outline-secondary w-100" onclick="toggleAllSurfacesInMode(1, false)">
-                        <i class="bi bi-x-circle"></i> 全部關閉
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Surface 控制 - 模式二 -->
-        <div class="card section-hidden" id="surfacesMode2">
-            <div class="card-body">
-                <h6 class="card-subtitle mb-3 text-muted">
-                    <i class="bi bi-grid"></i> 區域控制 - 分散
-                </h6>
-                <div class="surface-grid" id="surfaceGridMode2">
-                    <!-- 由 JS 動態生成 -->
-                </div>
-                <div class="mt-3">
-                    <button class="btn btn-sm btn-outline-primary w-100" onclick="toggleAllSurfacesInMode(2, true)">
-                        <i class="bi bi-check-all"></i> 全部開啟
-                    </button>
-                </div>
-                <div class="mt-2">
-                    <button class="btn btn-sm btn-outline-secondary w-100" onclick="toggleAllSurfacesInMode(2, false)">
+                    <button class="btn btn-sm btn-outline-secondary w-100" id="disableAllAreas" onclick="toggleAllSurfaces(false)">
                         <i class="bi bi-x-circle"></i> 全部關閉
                     </button>
                 </div>
@@ -483,6 +461,7 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+    <script src="control-settings.js"></script>
     <script>
         //#region settings
         const serverUrl = '192.168.0.201';
@@ -514,27 +493,10 @@
         };
 
         // Surface 設定（與伺服器保持一致）
-        const surfacesSettings = {
-            1: [
-                { SurfaceName: 'Main-1', ShowName: 'Main' },
-                // { SurfaceName: 'T1-1', ShowName: 'T1' },
-                { SurfaceName: 'T2-1', ShowName: 'T2' },
-                { SurfaceName: 'T3-1', ShowName: 'T3' },
-                { SurfaceName: 'T4-1', ShowName: 'T4' },
-                { SurfaceName: 'T5-1', ShowName: 'T5' },
-                { SurfaceName: 'T6-1', ShowName: 'T6' },
-                { SurfaceName: 'T7-1', ShowName: 'T7' }
-            ],
-            2: [
-                { SurfaceName: 'Main-2', ShowName: 'Main' },
-                { SurfaceName: 'T2-2', ShowName: 'T2' },
-                { SurfaceName: 'T3-2', ShowName: 'T3' },
-                { SurfaceName: 'T4-2', ShowName: 'T4' },
-                { SurfaceName: 'T5-2', ShowName: 'T5' },
-                { SurfaceName: 'T6-2', ShowName: 'T6' },
-                { SurfaceName: 'T7-2', ShowName: 'T7' }
-            ]
-        };
+        const surfacesSettings = ControlSettings.AREA_NAMES.map(name => ({
+            SurfaceName: name,
+            ShowName: name
+        }));
 
         //#endregion
 
@@ -542,19 +504,10 @@
         
         // 初始化 Surface 網格
         function initSurfaceGrids() {
-            // 模式 1
-            const grid1 = document.getElementById('surfaceGridMode1');
-            surfacesSettings[1].forEach(surface => {
+            const grid = document.getElementById('areaControlGrid');
+            surfacesSettings.forEach(surface => {
                 const div = createSurfaceToggle(surface);
-                grid1.appendChild(div);
-                surfaceStates[surface.SurfaceName] = false;
-            });
-
-            // 模式 2
-            const grid2 = document.getElementById('surfaceGridMode2');
-            surfacesSettings[2].forEach(surface => {
-                const div = createSurfaceToggle(surface);
-                grid2.appendChild(div);
+                grid.appendChild(div);
                 surfaceStates[surface.SurfaceName] = false;
             });
         }
@@ -578,20 +531,20 @@
             const container = document.getElementById('tableControlPanel');
             container.innerHTML = '';
             
-            for (let i = 0; i < 8; i++) {
+            ControlSettings.createSeatSettings().forEach(seat => {
                 const div = document.createElement('div');
                 div.className = 'table-control-item';
                 div.innerHTML = `
-                    <label class="table-control-label">座位 ${i + 1}</label>
-                    <div class="table-btn-group" id="table-group-${7-i}">
-                        <button class="table-btn" onclick="updateTableMode(${7-i}, 0)" data-val="0">預設</button>
-                        <button class="table-btn" onclick="updateTableMode(${7-i}, 1)" data-val="1">海洋</button>
-                        <button class="table-btn" onclick="updateTableMode(${7-i}, 2)" data-val="2">森林</button>
-                        <button class="table-btn" onclick="updateTableMode(${7-i}, 3)" data-val="3">液態食物</button>
+                    <label class="table-control-label">${seat.label}</label>
+                    <div class="table-btn-group" id="table-group-${seat.index}">
+                        <button class="table-btn" onclick="updateTableMode(${seat.index}, 0)" data-val="0">預設</button>
+                        <button class="table-btn" onclick="updateTableMode(${seat.index}, 1)" data-val="1">海洋</button>
+                        <button class="table-btn" onclick="updateTableMode(${seat.index}, 2)" data-val="2">森林</button>
+                        <button class="table-btn" onclick="updateTableMode(${seat.index}, 3)" data-val="3">液態食物</button>
                     </div>
                 `;
                 container.appendChild(div);
-            }
+            });
         }
 
         // 當使用者改變下拉選單時
@@ -696,36 +649,7 @@
             
             console.log(`切換到桌面模式 ${mode},已發送 maskId: ${mode}`);
 
-            // 更新 UI
-            // updateMaskModeUI(mode);
-
-            // 根據模式開啟對應的 Surfaces,關閉另一組
-            if (mode === 1) {
-                surfacesSettings[1].forEach(surface => {
-                    toggleSurface(surface.SurfaceName, true);
-                });
-                surfacesSettings[2].forEach(surface => {
-                    toggleSurface(surface.SurfaceName, false);
-                });
-            } else {
-                surfacesSettings[1].forEach(surface => {
-                    toggleSurface(surface.SurfaceName, false);
-                });
-                surfacesSettings[2].forEach(surface => {
-                    toggleSurface(surface.SurfaceName, true);
-                });
-            }
         }
-
-        // 更新 Mask 模式 UI
-        // function updateMaskModeUI(mode) {
-        //     currentMaskMode = mode;
-        //     // document.getElementById('currentMaskMode').textContent = mode == 1? '合併' : '分散';
-
-        //     // 切換 Surface 控制區域顯示
-        //     document.getElementById('surfacesMode1').className = mode === 1 ? 'card' : 'card section-hidden';
-        //     document.getElementById('surfacesMode2').className = mode === 2 ? 'card' : 'card section-hidden';
-        // }
 
         // 單一 Surface 切換
         function toggleSingleSurface(surfaceName) {
@@ -776,11 +700,6 @@
                 updateContentMode(state.contentMode);
             }
             
-            // 應用桌面模式(不發送 OSC,只更新 UI)
-            // if (state.maskMode) {
-            //     updateMaskModeUI(state.maskMode);
-            // }
-            
             // 應用 Surface 狀態(不發送 OSC,只更新 UI)
             if (state.surfaceStates) {
                 Object.keys(state.surfaceStates).forEach(surfaceName => {
@@ -813,12 +732,11 @@
             
             console.log('系統狀態已應用');
             console.log(`- 內容模式: ${state.contentMode}`);
-            // console.log(`- 桌面模式: ${state.maskMode}`);
         }
 
-        // 批次切換當前模式的所有 Surfaces
-        function toggleAllSurfacesInMode(mode, enabled) {
-            surfacesSettings[mode].forEach(surface => {
+        // 批次切換所有 Surfaces
+        function toggleAllSurfaces(enabled) {
+            surfacesSettings.forEach(surface => {
                 toggleSurface(surface.SurfaceName, enabled);
             });
         }
@@ -879,11 +797,6 @@
                     surfaceStates[data.surface] = data.enabled;
                     updateSurfaceUI(data.surface, data.enabled);
                 }
-
-                // 接收其他客戶端的 Mask 狀態更新
-                // if (data.type === 'maskStatusUpdate') {
-                //     updateMaskModeUI(data.maskId);
-                // }
 
                 // 接收自動循環狀態更新
                 if (data.type === 'autoCycleUpdate') {
