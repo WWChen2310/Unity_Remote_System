@@ -1,3 +1,28 @@
+# 目前部署設定
+
+## Node.js 與 MadMapper
+
+- 執行環境需為 `Node.js >= 18.1`。在本專案根目錄先執行 `npm ci`；沒有 lockfile 的情況才改用 `npm install`。
+- `madmapper.config.json` 是 MadMapper OSC 的唯一部署設定來源。請在 Node JSON 內修改 `ip`、`port`、`localPort`，以及每個區域完整的 `oscAddress`；OSC Address 不在 Unity Inspector 編輯。
+- 六個固定名稱依序為 `Main`、`T1`、`T2`、`T3`、`T4`、`Ground`。預設位址分別是 `/surfaces/Main/opacity`、`/surfaces/T1/opacity`、`/surfaces/T2/opacity`、`/surfaces/T3/opacity`、`/surfaces/T4/opacity`、`/surfaces/Ground/opacity`。完整 `oscAddress` 字串皆可依 MadMapper 實際命名修改。
+- 首次啟動可執行 `npm start`（等同 `node integrated-server.js`）。修改 JSON 後必須重啟 Node：使用 PM2 時執行 `pm2 restart <應用程式名稱>`；直接啟動時先停止舊程序，再重新執行啟動指令。
+- Node.js 負責傳送 OSC 給 MadMapper；Unity 不會傳送 OSC，也不需要安裝 Unity OSC 套件。
+
+## Unity 九座位設定
+
+- Unity 實際控制檔位於 `Assets/Script/Singleton/UnityModeController.cs`，其 `SeatCount = 9`。
+- WebSocket 的直接座位對應為 `Seat1` → `0`、`Seat2` → `1`、`Seat3` → `2`、`Seat4` → `3`、`Seat5` → `4`、`Seat6` → `5`、`Seat7` → `6`、`Seat8` → `7`、`Seat9` → `8`。
+- 在 `RegionManager` 新增 `Region ID 8`，並在 `CloudMaterials` 加入第九個材質，也就是 `CloudMaterials[8]`。
+- 如第九區需要區域特效，請在 `RegionVFX` 設定中加入 `RegionId = 8`，並依專案使用的狀態補齊對應清單。
+- `RegionManager` 缺少 index 8 時執行時仍安全，但第九座位不會產生對應視覺效果，直到設定完成。
+- 當 Region 或 CloudMaterials 設定數量未達至少 9 時，每個 `UnityModeController` 生命週期只顯示一次警告。
+
+## Web 部署
+
+Web 伺服器必須同時部署 `interface/console.html` 與 `interface/control-settings.js`；只部署 HTML 會使控制設定無法載入。
+
+---
+
 # Unity 遠端控制系統 - 部署指南
 
 ## 📋 系統架構
@@ -10,35 +35,23 @@
 
 ## 🚀 步驟 1：設置 Node.js 伺服器
 
-### 1.1 安裝 Node.js
-- 從 [nodejs.org](https://nodejs.org/) 下載並安裝 LTS 版本
+### 1.1 啟動目前專案
 
-### 1.2 建立專案目錄
+安裝 `Node.js >= 18.1`，在目前已簽入的專案根目錄執行：
+
 ```bash
-mkdir unity-control-server
-cd unity-control-server
+npm ci
+# 沒有 lockfile 時才使用 npm install
 ```
 
-### 1.3 初始化專案並安裝依賴
+接著編輯 `madmapper.config.json`，再啟動整合伺服器：
+
 ```bash
-npm init -y
-npm install ws
+npm start
+# 或 node integrated-server.js
 ```
 
-### 1.4 儲存伺服器代碼
-將 `server.js` 檔案儲存到專案目錄
-
-### 1.5 啟動伺服器
-```bash
-node server.js
-```
-
-成功後會顯示：
-```
-🚀 WebSocket 伺服器已啟動於 ws://0.0.0.0:3000
-```
-
-### 1.6 查看內網 IP
+### 1.2 查看內網 IP
 **Windows:**
 ```bash
 ipconfig
@@ -97,42 +110,9 @@ const serverUrl = '192.168.1.100';
    https://github.com/endel/NativeWebSocket.git#upm
    ```
 
-### 3.2 加入控制器腳本
+### 3.2 使用現有控制器
 
-1. 在 Unity 專案中建立 `Scripts` 資料夾
-2. 建立新的 C# 腳本 `UnityModeController.cs`
-3. 複製提供的程式碼
-
-### 3.3 掛載腳本
-
-1. 在 Hierarchy 中建立空物件，命名為 `ModeController`
-2. 將 `UnityModeController.cs` 拖曳到該物件上
-3. 在 Inspector 中修改 `Server Url` 為你的內網位址：
-   ```
-   ws://192.168.1.100:3000
-   ```
-
-### 3.4 實作模式邏輯
-
-在 `ApplyMode1()` ~ `ApplyMode4()` 函式中實作你的邏輯，例如：
-
-```csharp
-void ApplyMode1()
-{
-    // 範例：切換 Skybox
-    RenderSettings.skybox = mode1Skybox;
-    
-    // 範例：調整 HDRP Volume
-    Volume volume = FindObjectOfType<Volume>();
-    if (volume.profile.TryGet<ColorAdjustments>(out var colorAdj))
-    {
-        colorAdj.saturation.value = 0f; // 黑白模式
-    }
-    
-    // 範例：切換光照
-    DirectionalLight.intensity = 1.5f;
-}
-```
+請依上方「目前部署設定」使用既有的 `Assets/Script/Singleton/UnityModeController.cs`，不要另建或複製控制器腳本。
 
 ---
 
