@@ -7,13 +7,15 @@ using System.Threading.Tasks;
 
 public class UnityModeController : MonoBehaviour
 {
+    public const int SeatCount = 9;
+
     [Header("伺服器設定")]
     [SerializeField] private string serverUrl = "ws://192.168.0.201:3000"; // 請確認 IP
     
     [Header("當前狀態")]
     [SerializeField] private int currentMode = 1;
-    // [新功能] 8個桌子的模式
-    [SerializeField] private int[] currentTableModes = new int[8];
+    // [新功能] 9個座位的模式
+    [SerializeField] private int[] currentTableModes = new int[SeatCount];
 
     private WebSocket websocket;
     // [修改] 改用 ConcurrentQueue 以確保執行緒安全
@@ -124,9 +126,13 @@ public class UnityModeController : MonoBehaviour
     void UpdateLocalState(int newMode, int[] newTableModes)
     {
         // 更新桌子資料
-        if (newTableModes != null && newTableModes.Length == 8)
+        if (newTableModes != null)
         {
-            Array.Copy(newTableModes, currentTableModes, 8);
+            currentTableModes = NormalizeTableModes(newTableModes);
+        }
+        else if (currentTableModes == null || currentTableModes.Length != SeatCount)
+        {
+            currentTableModes = NormalizeTableModes(currentTableModes);
         }
 
         bool modeChanged = (currentMode != newMode);
@@ -166,13 +172,35 @@ public class UnityModeController : MonoBehaviour
     // [新功能] 分割內容模式實作
     void ApplyMode8()
     {
+        currentTableModes = NormalizeTableModes(currentTableModes);
+
+        if (RegionManager.Instance == null) return;
         Debug.Log("🪟 應用分割內容模式");
-        for (int i = 0; i < 8; i++)
+        for (int i = 0; i < SeatCount; i++)
         {
             int tableMode = currentTableModes[i];
-            // Debug.Log($"   - 桌子 {i+1}: 模式 {tableMode}");
-            // TODO: 在這裡實作您的畫面邏輯
+            int regionIndex = RegionIndexForSeat(i);
+            Debug.Log($"   - 座位 {i+1}: 模式 {tableMode}");
+            RegionManager.Instance.SetRegionStatus(regionIndex, tableMode);
+            RegionManager.Instance.SetCloudMaterial(regionIndex, tableMode);
+            RegionManager.Instance.SetRegionVFX(regionIndex, tableMode);
         }
+    }
+
+    public static int[] NormalizeTableModes(int[] values)
+    {
+        int[] normalized = new int[SeatCount];
+        if (values != null)
+        {
+            Array.Copy(values, normalized, Math.Min(values.Length, SeatCount));
+        }
+
+        return normalized;
+    }
+
+    public static int RegionIndexForSeat(int seatIndex)
+    {
+        return seatIndex;
     }
 
     async void SendMessage(object data)
