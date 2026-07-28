@@ -12,6 +12,8 @@ const {
     validateMadmapperConfig,
     normalizeSurfaceStates,
     createMadmapperOscMessage
+    normalizeGroundThemeId,
+    isValidGroundThemeId,
 } = require('./control-model');
 
 let madmapperConfig;
@@ -44,6 +46,8 @@ udpPort.on('error', (error) => console.error('OSC error:', error));
 let systemState = {
     contentMode: 1,
     maskMode: 1,
+    // 地面內容與桌面背景互相獨立，各自保存。
+    groundThemeId: 'none',
     surfaceStates: normalizeSurfaceStates({}, madmapperConfig.areaMap),
     tableModes: normalizeTableModes([]),
     autoCycle: {
@@ -75,6 +79,7 @@ function loadSystemState() {
                 madmapperConfig.areaMap
             );
             systemState.tableModes = normalizeTableModes(loaded.tableModes);
+            systemState.groundThemeId = normalizeGroundThemeId(loaded.groundThemeId);
             if (loaded.autoCycle) {
                 systemState.autoCycle = {
                     ...systemState.autoCycle,
@@ -259,6 +264,25 @@ wss.on('connection', (ws, req) => {
                         timestamp: Date.now()
                     });
                 }
+            }
+
+            if (data.type === 'switchGroundTheme') {
+                if (!isValidGroundThemeId(data.groundThemeId)) {
+                    console.warn(`Unknown ground theme: ${String(data.groundThemeId)}`);
+                    return;
+                }
+
+                systemState.groundThemeId = data.groundThemeId;
+                saveSystemState();
+
+                console.log(`Ground theme updated to ${systemState.groundThemeId}`);
+
+                // 只廣播地面狀態，不動 contentMode 也不動 tableModes。
+                broadcast({
+                    type: 'groundThemeUpdate',
+                    groundThemeId: systemState.groundThemeId,
+                    timestamp: Date.now()
+                });
             }
 
             if (data.type === 'unitySync') {

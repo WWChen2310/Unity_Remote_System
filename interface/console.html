@@ -268,7 +268,7 @@
         <div class="card">
             <div class="card-body">
                 <h6 class="card-subtitle mb-3 text-muted">
-                    <i class="bi bi-film"></i> 內容模式
+                    <i class="bi bi-film"></i> 桌面背景
                 </h6>
                 <div class="row g-2">
                     <div class="col-12">
@@ -311,6 +311,39 @@
                         <button class="btn btn-outline-secondary mode-btn w-100" onclick="switchContentMode(7)" id="content7" name="萬聖節">
                             <i class="fa fa-ghost"></i>
                             <div>萬聖節</div>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 地面內容：與桌面背景互相獨立 -->
+        <div class="card">
+            <div class="card-body">
+                <h6 class="card-subtitle mb-3 text-muted">
+                    <i class="bi bi-square"></i> 地面內容
+                    <small class="text-muted">（與桌面背景獨立切換）</small>
+                </h6>
+                <div class="row g-2">
+                    <div class="col-4">
+                        <button class="btn btn-outline-secondary mode-btn w-100"
+                                onclick="switchGroundTheme('none')" id="ground-none" name="無內容">
+                            <i class="bi bi-slash-circle"></i>
+                            <div>無內容</div>
+                        </button>
+                    </div>
+                    <div class="col-4">
+                        <button class="btn btn-outline-secondary mode-btn w-100"
+                                onclick="switchGroundTheme('crops')" id="ground-crops" name="稻田">
+                            <i class="bi bi-4-circle"></i>
+                            <div>稻田</div>
+                        </button>
+                    </div>
+                    <div class="col-4">
+                        <button class="btn btn-outline-secondary mode-btn w-100"
+                                onclick="switchGroundTheme('watergrass')" id="ground-watergrass" name="水草">
+                            <i class="bi bi-5-circle"></i>
+                            <div>水草</div>
                         </button>
                     </div>
                 </div>
@@ -464,7 +497,7 @@
     <script src="control-settings.js"></script>
     <script>
         //#region settings
-        const serverUrl = '192.168.0.201';
+        const serverUrl = '10.0.1.251';
         const wsUrl = `ws://${serverUrl}:3000`;
         
         let ws = null;
@@ -589,6 +622,28 @@
             }
         }
 
+        // 地面內容切換。與桌面背景是兩條獨立的指令，互不影響。
+        function switchGroundTheme(themeId) {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'switchGroundTheme',
+                    groundThemeId: themeId
+                }));
+                // 等待伺服器廣播後才更新 UI，避免本地狀態與 canonical 狀態不一致
+            } else {
+                alert('未連接到伺服器!');
+            }
+        }
+
+        function updateGroundTheme(themeId) {
+            const ids = ['none', 'crops', 'watergrass'];
+            const active = ids.includes(themeId) ? themeId : 'none';
+            ids.forEach((id) => {
+                const button = document.getElementById('ground-' + id);
+                if (button) button.classList.toggle('active', id === active);
+            });
+        }
+
         function updateContentMode(mode) {
             currentContentMode = mode;
             let name = document.getElementById(`content${mode}`).name;
@@ -699,6 +754,9 @@
             if (state.contentMode !== undefined) {
                 updateContentMode(state.contentMode);
             }
+
+            // 應用地面內容（重連時由 canonical 狀態恢復）
+            updateGroundTheme(state.groundThemeId);
             
             // 應用 Surface 狀態(不發送 OSC,只更新 UI)
             if (state.surfaceStates) {
@@ -779,6 +837,11 @@
                     if (data.tableModes) {
                         updateTableUI(data.tableModes);
                     }
+                }
+
+                // 接收地面內容更新
+                if (data.type === 'groundThemeUpdate') {
+                    updateGroundTheme(data.groundThemeId);
                 }
 
                 // 接收其他客戶端的模式更新

@@ -11,6 +11,20 @@ function normalizeTableModes(value) {
   });
 }
 
+const GROUND_THEMES = ['none', 'crops', 'watergrass'];
+
+/**
+ * 地面內容與桌面背景各自獨立。未知值一律落回 'none'（地面不輸出內容），
+ * 而不是沿用桌面的主題——兩區永遠不會因為對方而改變。
+ */
+function normalizeGroundThemeId(value) {
+  return GROUND_THEMES.includes(value) ? value : 'none';
+}
+
+function isValidGroundThemeId(value) {
+  return GROUND_THEMES.includes(value);
+}
+
 function isValidTableIndex(value) {
   return Number.isInteger(value) && value >= 0 && value < SEAT_COUNT;
 }
@@ -116,6 +130,9 @@ function createMadmapperOscMessage(areaMap, areaName, enabled) {
 
 module.exports = {
   SEAT_COUNT,
+  GROUND_THEMES,
+  normalizeGroundThemeId,
+  isValidGroundThemeId,
   normalizeTableModes,
   isValidTableIndex,
   validateMadmapperConfig,

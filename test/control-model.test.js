@@ -7,6 +7,9 @@ const packageLock = require('../package-lock.json');
 
 const {
   SEAT_COUNT,
+  GROUND_THEMES,
+  normalizeGroundThemeId,
+  isValidGroundThemeId,
   normalizeTableModes,
   isValidTableIndex,
   validateMadmapperConfig,
@@ -172,4 +175,27 @@ test('validateMadmapperConfig rejects invalid remote and local ports', () => {
       new RegExp(`${field}.*integer|${field}.*1.*65535`, 'i'),
     );
   }
+});
+
+test('ground theme ids are limited to the three the console offers', () => {
+  assert.deepStrictEqual(GROUND_THEMES, ['none', 'crops', 'watergrass']);
+});
+
+test('unknown ground themes fall back to none rather than to a table theme', () => {
+  // 地面與桌面互相獨立：無法辨識的值必須是「不輸出內容」，
+  // 絕不能沿用桌面正在播的主題。
+  assert.strictEqual(normalizeGroundThemeId('ocean'), 'none');
+  assert.strictEqual(normalizeGroundThemeId(undefined), 'none');
+  assert.strictEqual(normalizeGroundThemeId(null), 'none');
+  assert.strictEqual(normalizeGroundThemeId(4), 'none');
+  assert.strictEqual(normalizeGroundThemeId('crops'), 'crops');
+  assert.strictEqual(normalizeGroundThemeId('watergrass'), 'watergrass');
+});
+
+test('ground theme validation rejects anything outside the supported set', () => {
+  assert.strictEqual(isValidGroundThemeId('none'), true);
+  assert.strictEqual(isValidGroundThemeId('crops'), true);
+  assert.strictEqual(isValidGroundThemeId('watergrass'), true);
+  assert.strictEqual(isValidGroundThemeId('starfield'), false);
+  assert.strictEqual(isValidGroundThemeId(''), false);
 });
