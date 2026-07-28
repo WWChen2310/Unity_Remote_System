@@ -6,7 +6,7 @@
 
 **Architecture:** Pure CommonJS helpers will own seat normalization, area-state normalization, configuration validation, and OSC-message construction so these behaviors can be tested without starting network listeners. The existing Web console and WebSocket server will consume those helpers, while Unity will normalize and apply nine seat values with an identity seat-to-region mapping.
 
-**Tech Stack:** Node.js 14+, built-in `node:test` and `assert`, WebSocket (`ws`), OSC (`osc`), browser JavaScript, Unity 6/C#, NativeWebSocket, Unity Test Framework.
+**Tech Stack:** Node.js 18.1+, built-in `node:test` and `assert`, WebSocket (`ws`), OSC (`osc`), browser JavaScript, Unity 6/C#, NativeWebSocket, Unity Test Framework.
 
 ---
 
