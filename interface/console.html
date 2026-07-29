@@ -358,7 +358,7 @@
                     <h6 class="card-subtitle text-muted mb-0">
                         <i class="bi bi-layout-split"></i> 座位個別控制
                     </h6>
-                    <small class="text-muted">(所有桌面背景皆可用)</small>
+                    <small class="text-danger" id="seatLockHint" style="display:none;">(稻田／水草背景下無座位效果)</small>
                 </div>
                 
                 <div id="tableControlPanel" class="table-control-grid">
@@ -509,6 +509,9 @@
         
         // 自動循環相關變數
         let autoCycleEnabled = false;
+        // 稻田(4) 與水草(5) 不顯示座位雲層，席位控制在這兩個背景下無作用。
+        const SEAT_UNSUPPORTED_MODES = [4, 5];
+
         let cycleModes = [1, 2, 3, 4, 5]; // 預設循環模式
         let cycleInterval = 10; // 分鐘
         let cycleTimerInterval = null;
@@ -661,7 +664,13 @@
                 btn.className = (i === mode) ? 'btn btn-primary mode-btn w-100 active' : 'btn btn-outline-secondary mode-btn w-100';
             });
 
-            // 9 席在所有桌面背景下都有效，面板不再隨背景鎖定。
+            // 座位疊層在多數背景下都有效，但稻田與水草不顯示雲層，
+            // 席位在那兩個背景下沒有視覺呈現，所以面板鎖起來避免誤操作。
+            const panel = document.getElementById('tableControlPanel');
+            const hint = document.getElementById('seatLockHint');
+            const seatsUnavailable = SEAT_UNSUPPORTED_MODES.includes(mode);
+            panel.classList.toggle('disabled-section', seatsUnavailable);
+            hint.style.display = seatsUnavailable ? 'block' : 'none';
         }
 
         // 更新下拉選單 UI
