@@ -11,7 +11,7 @@ const {
     isValidTableIndex,
     validateMadmapperConfig,
     normalizeSurfaceStates,
-    createMadmapperOscMessage
+    createMadmapperOscMessage,
     normalizeGroundThemeId,
     isValidGroundThemeId,
 } = require('./control-model');

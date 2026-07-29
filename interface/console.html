@@ -271,12 +271,6 @@
                     <i class="bi bi-film"></i> 桌面背景
                 </h6>
                 <div class="row g-2">
-                    <div class="col-12">
-                        <button class="btn btn-outline-secondary mode-btn w-100" onclick="switchContentMode(8)" id="content8" name="分割內容">
-                            <i class="bi bi-grid-1x2"></i>
-                            <div>分割內容</div>
-                        </button>
-                    </div>
                     <div class="col-4">
                         <button class="btn btn-outline-secondary mode-btn w-100" onclick="switchContentMode(1)" id="content1" name="入場">
                             <i class="bi bi-1-circle"></i>
@@ -305,6 +299,14 @@
                         <button class="btn btn-outline-secondary mode-btn w-100" onclick="switchContentMode(5)" id="content5" name="水草">
                             <i class="bi bi-5-circle"></i>
                             <div>水草</div>
+                        </button>
+                    </div>
+                    <!-- 星空是原本的「分割內容」背景。mode 仍是 8：
+                         那是 MultipleContents 場景的索引，圖示上的 6 只是排列編號。 -->
+                    <div class="col-4">
+                        <button class="btn btn-outline-secondary mode-btn w-100" onclick="switchContentMode(8)" id="content8" name="星空">
+                            <i class="bi bi-6-circle"></i>
+                            <div>星空</div>
                         </button>
                     </div>
                     <div class="col-4">
@@ -356,7 +358,7 @@
                     <h6 class="card-subtitle text-muted mb-0">
                         <i class="bi bi-layout-split"></i> 座位個別控制
                     </h6>
-                    <small class="text-danger" id="splitModeHint" style="display:none;">(僅在分割內容模式下可用)</small>
+                    <small class="text-danger" id="splitModeHint" style="display:none;">(僅在星空背景下可用)</small>
                 </div>
                 
                 <div id="tableControlPanel" class="table-control-grid disabled-section">
@@ -454,7 +456,7 @@
                                     <option value="3">森林 (ID: 3)</option>
                                     <option value="4">稻田 (ID: 4)</option>
                                     <option value="5">水草 (ID: 5)</option>
-                                    <option value="8">分割內容 (ID: 8)</option>
+                                    <option value="8">星空 (ID: 8)</option>
                                     <!-- <option value="7">萬聖節 (ID: 7)</option> -->
                                 </select>
                             </div>
@@ -522,7 +524,7 @@
             5: '水草',
             6: '全白畫面',
             7: '萬聖節',
-            8: '分割內容'
+            8: '星空'
         };
 
         // Surface 設定（與伺服器保持一致）
@@ -653,7 +655,10 @@
             const btns = document.getElementsByClassName('mode-btn');
             Array.from(btns).forEach(btn => {
                 let i = parseInt(btn.id.slice(7));
-                if (btn) btn.className = (i === mode) ? 'btn btn-primary mode-btn w-100 active' : 'btn btn-outline-secondary mode-btn w-100';
+                // 地面內容的按鈕也用 mode-btn 樣式，但不屬於桌面背景這一組。
+                // 沒有這個保護，切換桌面背景會把地面按鈕的高亮一起清掉。
+                if (Number.isNaN(i)) return;
+                btn.className = (i === mode) ? 'btn btn-primary mode-btn w-100 active' : 'btn btn-outline-secondary mode-btn w-100';
             });
 
             // 控制分割面板是否可用
