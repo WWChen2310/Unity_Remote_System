@@ -225,9 +225,8 @@ wss.on('connection', (ws, req) => {
             if (data.type === 'switchMode') {
                 systemState.contentMode = data.mode;
 
-                if (data.mode === 8) {
-                    systemState.tableModes = normalizeTableModes([]);
-                }
+                // 席位狀態不再隨背景重置。9 席在所有桌面背景下都有效，
+                // 切到星空時清空會讓操作者已經設好的席位無故消失。
 
                 if (data.manual && systemState.autoCycle.enabled) {
                     systemState.autoCycle.currentIndex = -1;

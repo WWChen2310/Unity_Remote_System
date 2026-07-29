@@ -358,10 +358,10 @@
                     <h6 class="card-subtitle text-muted mb-0">
                         <i class="bi bi-layout-split"></i> 座位個別控制
                     </h6>
-                    <small class="text-danger" id="splitModeHint" style="display:none;">(僅在星空背景下可用)</small>
+                    <small class="text-muted">(所有桌面背景皆可用)</small>
                 </div>
                 
-                <div id="tableControlPanel" class="table-control-grid disabled-section">
+                <div id="tableControlPanel" class="table-control-grid">
                     </div>
             </div>
         </div>
@@ -661,16 +661,7 @@
                 btn.className = (i === mode) ? 'btn btn-primary mode-btn w-100 active' : 'btn btn-outline-secondary mode-btn w-100';
             });
 
-            // 控制分割面板是否可用
-            const panel = document.getElementById('tableControlPanel');
-            const hint = document.getElementById('splitModeHint');
-            if (mode === 8) {
-                panel.classList.remove('disabled-section');
-                hint.style.display = 'none';
-            } else {
-                panel.classList.add('disabled-section');
-                hint.style.display = 'block';
-            }
+            // 9 席在所有桌面背景下都有效，面板不再隨背景鎖定。
         }
 
         // 更新下拉選單 UI
