@@ -598,10 +598,8 @@
                 div.innerHTML = `
                     <label class="table-control-label">${seat.label}</label>
                     <div class="table-btn-group" id="table-group-${seat.index}">
-                        <button class="table-btn" onclick="updateTableMode(${seat.index}, 0)" data-val="0">預設</button>
-                        <button class="table-btn" onclick="updateTableMode(${seat.index}, 1)" data-val="1">海洋</button>
-                        <button class="table-btn" onclick="updateTableMode(${seat.index}, 2)" data-val="2">森林</button>
-                        <button class="table-btn" onclick="updateTableMode(${seat.index}, 3)" data-val="3">液態食物</button>
+                        ${ControlSettings.SEAT_MODES.map(mode => `
+                        <button class="table-btn" onclick="updateTableMode(${seat.index}, ${mode.value})" data-val="${mode.value}">${mode.label}</button>`).join('')}
                     </div>
                 `;
                 container.appendChild(div);

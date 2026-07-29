@@ -8,6 +8,7 @@ const path = require('path');
 const {
     SEAT_COUNT,
     normalizeTableModes,
+    isValidSeatMode,
     isValidTableIndex,
     validateMadmapperConfig,
     normalizeSurfaceStates,
@@ -245,12 +246,7 @@ wss.on('connection', (ws, req) => {
                 const tableIndex = data.tableIndex;
                 const modeValue = data.mode;
 
-                if (
-                    isValidTableIndex(tableIndex)
-                    && Number.isInteger(modeValue)
-                    && modeValue >= 0
-                    && modeValue <= 3
-                ) {
+                if (isValidTableIndex(tableIndex) && isValidSeatMode(modeValue)) {
                     systemState.tableModes[tableIndex] = modeValue;
                     saveSystemState();
 

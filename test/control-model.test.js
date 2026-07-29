@@ -11,6 +11,8 @@ const {
   normalizeGroundThemeId,
   isValidGroundThemeId,
   normalizeTableModes,
+  SEAT_MODES,
+  isValidSeatMode,
   isValidTableIndex,
   validateMadmapperConfig,
   normalizeSurfaceStates,
@@ -57,8 +59,20 @@ test('normalizeTableModes pads eight valid seats with a trailing zero', () => {
 test('normalizeTableModes truncates oversized input and replaces invalid values', () => {
   assert.deepEqual(
     normalizeTableModes([0, 1, 2, 3, -1, 4, '2', null, 3, 1]),
-    [0, 1, 2, 3, 0, 0, 0, 0, 3],
+    [0, 1, 2, 3, 0, 4, 0, 0, 3],
   );
+});
+
+// 座位狀態的順序就是送給 Unity 的數值，也是 Unity StatusSetting.settings 的索引。
+test('seat modes cover 關燈 through 開燈 in the order Unity expects', () => {
+  assert.deepEqual(
+    SEAT_MODES.map(({ value, label }) => [value, label]),
+    [[0, '關燈'], [1, '海洋'], [2, '森林'], [3, '液態食物'], [4, '開燈']],
+  );
+  assert.equal(isValidSeatMode(4), true);
+  assert.equal(isValidSeatMode(5), false);
+  assert.equal(isValidSeatMode(-1), false);
+  assert.equal(isValidSeatMode(1.5), false);
 });
 
 test('isValidTableIndex accepts only integer indexes from zero through eight', () => {

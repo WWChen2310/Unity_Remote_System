@@ -1,5 +1,9 @@
 'use strict';
 
+// 座位狀態清單由介面那份共用模組定義，這裡直接沿用，
+// 免得新增狀態時瀏覽器認得、伺服器卻把它濾掉。
+const { SEAT_MODES, isValidSeatMode } = require('./interface/control-settings');
+
 const SEAT_COUNT = 9;
 const REQUIRED_AREA_NAMES = ['Main', 'T1', 'T2', 'T3', 'T4', 'Ground'];
 // 工作燈不像投影區域那樣綁死實體配置，數量與名稱可在 madmapper.config.json 調整；
@@ -10,7 +14,7 @@ function normalizeTableModes(value) {
   const source = Array.isArray(value) ? value : [];
   return Array.from({ length: SEAT_COUNT }, (_, index) => {
     const mode = source[index];
-    return Number.isInteger(mode) && mode >= 0 && mode <= 3 ? mode : 0;
+    return isValidSeatMode(mode) ? mode : 0;
   });
 }
 
@@ -178,6 +182,8 @@ function createMadmapperOscMessage(areaMap, areaName, enabled) {
 
 module.exports = {
   SEAT_COUNT,
+  SEAT_MODES,
+  isValidSeatMode,
   LIGHT_NAMES,
   GROUND_THEMES,
   normalizeGroundThemeId,
