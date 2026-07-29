@@ -2,6 +2,9 @@
 
 const SEAT_COUNT = 9;
 const REQUIRED_AREA_NAMES = ['Main', 'T1', 'T2', 'T3', 'T4', 'Ground'];
+// 工作燈不像投影區域那樣綁死實體配置，數量與名稱可在 madmapper.config.json 調整；
+// 這裡只是介面預設顯示的三盞。
+const LIGHT_NAMES = ['Light1', 'Light2', 'Light3'];
 
 function normalizeTableModes(value) {
   const source = Array.isArray(value) ? value : [];
@@ -93,13 +96,58 @@ function validateMadmapperConfig(config) {
     );
   }
 
+  // 工作燈與投影區域是不同的東西，但對 MadMapper 來說都只是「一個 OSC address 收 0/1」。
+  // 所以驗證、狀態保存、送 OSC 全部共用同一條路徑，只有介面分區顯示不同。
+  if (!Array.isArray(config.lights)) {
+    throw new TypeError('MadMapper lights must be an array');
+  }
+
+  const lightMap = {};
+  const lights = config.lights.map((light, index) => {
+    const normalized = validateMadmapperTarget(light, index, 'light');
+    if (
+      Object.prototype.hasOwnProperty.call(lightMap, normalized.name)
+      || Object.prototype.hasOwnProperty.call(areaMap, normalized.name)
+    ) {
+      throw new Error(`MadMapper light name "${normalized.name}" is duplicated`);
+    }
+    lightMap[normalized.name] = normalized;
+    return normalized;
+  });
+
   return {
     ip: config.ip,
     port: config.port,
     localPort: config.localPort,
     areas,
     areaMap,
+    lights,
+    lightMap,
+    // 送 OSC 與保存開關狀態時用這張合併表，區域與工作燈一視同仁。
+    targetMap: { ...areaMap, ...lightMap },
   };
+}
+
+function validateMadmapperTarget(entry, index, kind) {
+  if (entry === null || typeof entry !== 'object' || Array.isArray(entry)) {
+    throw new TypeError(`MadMapper ${kind} at index ${index} must be an object`);
+  }
+
+  const { name, oscAddress } = entry;
+  if (typeof name !== 'string' || name === '') {
+    throw new TypeError(`MadMapper ${kind} at index ${index} must have a nonempty name`);
+  }
+  if (
+    typeof oscAddress !== 'string'
+    || oscAddress === ''
+    || !oscAddress.startsWith('/')
+  ) {
+    throw new TypeError(
+      `MadMapper ${kind} "${name}" oscAddress must be nonempty and start with a slash (/)`,
+    );
+  }
+
+  return { name, oscAddress };
 }
 
 function validatePort(value, fieldName) {
@@ -130,6 +178,7 @@ function createMadmapperOscMessage(areaMap, areaName, enabled) {
 
 module.exports = {
   SEAT_COUNT,
+  LIGHT_NAMES,
   GROUND_THEMES,
   normalizeGroundThemeId,
   isValidGroundThemeId,

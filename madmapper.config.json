@@ -27,5 +27,19 @@
       "name": "Ground",
       "oscAddress": "/surfaces/Ground/opacity"
     }
+  ],
+  "lights": [
+    {
+      "name": "Light1",
+      "oscAddress": "/surfaces/Light1/opacity"
+    },
+    {
+      "name": "Light2",
+      "oscAddress": "/surfaces/Light2/opacity"
+    },
+    {
+      "name": "Light3",
+      "oscAddress": "/surfaces/Light3/opacity"
+    }
   ]
 }

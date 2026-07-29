@@ -48,7 +48,7 @@ let systemState = {
     maskMode: 1,
     // 地面內容與桌面背景互相獨立，各自保存。
     groundThemeId: 'none',
-    surfaceStates: normalizeSurfaceStates({}, madmapperConfig.areaMap),
+    surfaceStates: normalizeSurfaceStates({}, madmapperConfig.targetMap),
     tableModes: normalizeTableModes([]),
     autoCycle: {
         enabled: false,
@@ -64,7 +64,7 @@ let autoCycleIntervalId = null;
 function initializeSurfaceStates() {
     systemState.surfaceStates = normalizeSurfaceStates(
         systemState.surfaceStates,
-        madmapperConfig.areaMap
+        madmapperConfig.targetMap
     );
 }
 
@@ -76,7 +76,7 @@ function loadSystemState() {
             if (loaded.maskMode !== undefined) systemState.maskMode = loaded.maskMode;
             systemState.surfaceStates = normalizeSurfaceStates(
                 loaded.surfaceStates,
-                madmapperConfig.areaMap
+                madmapperConfig.targetMap
             );
             systemState.tableModes = normalizeTableModes(loaded.tableModes);
             systemState.groundThemeId = normalizeGroundThemeId(loaded.groundThemeId);
@@ -97,7 +97,7 @@ function loadSystemState() {
     systemState.tableModes = normalizeTableModes(systemState.tableModes);
     systemState.surfaceStates = normalizeSurfaceStates(
         systemState.surfaceStates,
-        madmapperConfig.areaMap
+        madmapperConfig.targetMap
     );
 
     if (systemState.tableModes.length !== SEAT_COUNT) {
@@ -294,7 +294,7 @@ wss.on('connection', (ws, req) => {
             if (data.type === 'madmapperControl') {
                 const enabled = data.enabled === true;
                 const oscMessage = createMadmapperOscMessage(
-                    madmapperConfig.areaMap,
+                    madmapperConfig.targetMap,
                     data.surface,
                     enabled
                 );
@@ -334,7 +334,7 @@ wss.on('connection', (ws, req) => {
 function handleMadmapperControl(
     data,
     oscMessage = createMadmapperOscMessage(
-        madmapperConfig.areaMap,
+        madmapperConfig.targetMap,
         data.surface,
         data.enabled === true
     )

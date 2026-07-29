@@ -410,6 +410,18 @@
             </div>
         </div>
 
+        <!-- 工作燈開關 -->
+        <div class="card" id="lightControls">
+            <div class="card-body">
+                <h6 class="card-subtitle mb-3 text-muted">
+                    <i class="bi bi-lightbulb"></i> 工作燈開關
+                </h6>
+                <div class="surface-grid" id="lightControlGrid">
+                    <!-- 由 JS 動態生成 -->
+                </div>
+            </div>
+        </div>
+
                 <!-- 自動循環控制 -->
         <div class="card">
             <div class="card-body">
@@ -536,16 +548,27 @@
             ShowName: name
         }));
 
+        // 工作燈：對伺服器來說跟投影區域是同一種東西（一個 OSC address 收 0/1），
+        // 所以共用 surfaceStates 與 madmapperControl，只有顯示分區不同。
+        const lightsSettings = ControlSettings.LIGHT_NAMES.map(name => ({
+            SurfaceName: name,
+            ShowName: ControlSettings.LIGHT_LABELS[name] || name
+        }));
+
         //#endregion
 
         //#region init & update methods
         
         // 初始化 Surface 網格
         function initSurfaceGrids() {
-            const grid = document.getElementById('areaControlGrid');
-            surfacesSettings.forEach(surface => {
-                const div = createSurfaceToggle(surface);
-                grid.appendChild(div);
+            fillSurfaceGrid('areaControlGrid', surfacesSettings);
+            fillSurfaceGrid('lightControlGrid', lightsSettings);
+        }
+
+        function fillSurfaceGrid(gridId, settings) {
+            const grid = document.getElementById(gridId);
+            settings.forEach(surface => {
+                grid.appendChild(createSurfaceToggle(surface));
                 surfaceStates[surface.SurfaceName] = false;
             });
         }
@@ -589,8 +612,10 @@
         function updateTableMode(index, value) {
             if (!ws || ws.readyState !== WebSocket.OPEN) return;
             
-            // 如果目前模式不是 8，禁止操作桌面
-            if (currentContentMode !== 8) return;
+            // 9 席在每個桌面背景下都有效，不再只限原本的「分割內容」模式。
+            // 只有稻田／水草不顯示雲層、席位沒有視覺呈現，才擋下來——
+            // 判斷條件與面板上鎖用同一份清單，兩邊不會各自漂移。
+            if (SEAT_UNSUPPORTED_MODES.includes(currentContentMode)) return;
 
             ws.send(JSON.stringify({
                 type: 'updateTableMode',

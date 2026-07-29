@@ -35,6 +35,11 @@ function createValidConfig() {
       { name: 'T4', oscAddress: '/surfaces/T4' },
       { name: 'Ground', oscAddress: '/surfaces/Ground' },
     ],
+    lights: [
+      { name: 'Light1', oscAddress: '/surfaces/Light1' },
+      { name: 'Light2', oscAddress: '/surfaces/Light2' },
+      { name: 'Light3', oscAddress: '/surfaces/Light3' },
+    ],
   };
 }
 
