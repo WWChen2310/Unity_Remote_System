@@ -1,0 +1,32 @@
+{
+  "port": 3100,
+  "token": "change-me",
+  "allowedRemotes": ["192.168.0.201", "127.0.0.1"],
+  "gracefulStopSec": 5,
+  "startDelaySec": 2,
+  "profiles": {
+    "s1": {
+      "processes": [
+        {
+          "name": "s1",
+          "exe": "C:/Room/S1/RoomS1.exe",
+          "args": ["-roomServerUrl", "ws://192.168.0.201:3000", "-screen-fullscreen", "0", "-logFile", "C:/Room/logs/s1.log"]
+        }
+      ]
+    },
+    "s2": {
+      "processes": [
+        {
+          "name": "s2-tables",
+          "exe": "C:/Room/S2/RoomS2.exe",
+          "args": ["-roomRole", "tables", "-roomServerUrl", "ws://192.168.0.201:3000", "-screen-fullscreen", "0", "-logFile", "C:/Room/logs/s2-tables.log"]
+        },
+        {
+          "name": "s2-ground",
+          "exe": "C:/Room/S2/RoomS2.exe",
+          "args": ["-roomRole", "ground", "-roomOscPort", "9001", "-roomServerUrl", "ws://192.168.0.201:3000", "-screen-fullscreen", "0", "-logFile", "C:/Room/logs/s2-ground.log"]
+        }
+      ]
+    }
+  }
+}

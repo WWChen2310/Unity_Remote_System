@@ -14,8 +14,13 @@ const repositoryRoot = path.join(__dirname, '..');
 const SHIPPED_SOURCES = [
   'integrated-server.js',
   'control-model.js',
+  'profile-model.js',
+  'room-presence.js',
   'ecosystem.config.js',
   path.join('interface', 'control-settings.js'),
+  path.join('agent', 'agent-config.js'),
+  path.join('agent', 'process-supervisor.js'),
+  path.join('agent', 'room-agent.js'),
 ];
 
 test('every shipped script parses, including the ones no test requires', () => {

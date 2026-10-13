@@ -8,7 +8,8 @@
     "dev": "nodemon integrated-server.js",
     "simple": "node server.js",
     "web": "node web-server.js",
-    "test": "node --test"
+    "test": "node --test",
+    "agent": "node agent/room-agent.js"
   },
   "keywords": [
     "unity",
