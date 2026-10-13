@@ -45,7 +45,7 @@ class RoomPresence extends EventEmitter {
         return;
       }
 
-      const waiter = { build, roles, since, resolve, timer: null };
+      const waiter = { build, roles, since, resolve, reject, timer: null };
       waiter.timer = setTimeout(() => {
         this.waiters.delete(waiter);
         const missing = this.missingRoles(build, roles, since);
@@ -53,6 +53,15 @@ class RoomPresence extends EventEmitter {
       }, timeoutMs);
       this.waiters.add(waiter);
     });
+  }
+
+  /** 伺服器關閉時取消所有等待，不留下會讓 process 無法結束的計時器。 */
+  cancelAll(reason = 'cancelled') {
+    for (const waiter of [...this.waiters]) {
+      clearTimeout(waiter.timer);
+      this.waiters.delete(waiter);
+      waiter.reject(new Error(reason));
+    }
   }
 
   checkWaiters() {

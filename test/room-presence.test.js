@@ -86,6 +86,16 @@ test('unregister removes the room from list() and emits change', () => {
   assert.deepEqual(changes, [1, 0]);
 });
 
+test('cancelAll rejects pending waits so nothing keeps the process alive', async () => {
+  const { presence } = createPresence();
+  const pending = presence.waitFor('s1', ['both'], { since: 0, timeoutMs: 60000 });
+
+  presence.cancelAll('server closing');
+
+  await assert.rejects(pending, /server closing/);
+  assert.equal(presence.waiters.size, 0);
+});
+
 test('registering the same connection again replaces its build and role', () => {
   const { presence } = createPresence();
   presence.register('a', { build: 's1', role: 'both' });
