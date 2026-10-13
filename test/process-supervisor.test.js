@@ -30,9 +30,14 @@ class FakeChild extends EventEmitter {
 /**
  * calls 依序記錄每個外部動作；exitOnGracefulKill 決定 child 收到 taskkill /PID（不加 /F）時是否結束。
  */
-function createHarness({ exitOnGracefulKill = true, buildInfo = (dir) => ({ build: dir.endsWith('S1') ? 's1' : 's2' }) } = {}) {
+function createHarness({
+  exitOnGracefulKill = true,
+  buildInfo = (dir) => ({ build: dir.endsWith('S1') ? 's1' : 's2' }),
+  running = [],
+} = {}) {
   const calls = [];
   const children = [];
+  const alive = new Set(running.map(({ pid }) => pid));
   let nextPid = 100;
 
   const supervisor = new ProcessSupervisor({
@@ -54,9 +59,17 @@ function createHarness({ exitOnGracefulKill = true, buildInfo = (dir) => ({ buil
         if (child && (forced || exitOnGracefulKill)) {
           child.emit('exit', forced ? 1 : 0);
         }
+        if (forced || exitOnGracefulKill) alive.delete(Number(args[1]));
+      }
+      if (file === 'taskkill' && args[0] === '/IM') {
+        for (const process of running) {
+          if (process.image === args[1]) alive.delete(process.pid);
+        }
       }
       return { code: 0 };
     },
+    listProcesses: async () => running.filter(({ pid }) => alive.has(pid)),
+    isAlive: (pid) => alive.has(pid),
     delay: async (ms) => {
       calls.push({ kind: 'delay', detail: String(ms) });
     },
@@ -64,7 +77,7 @@ function createHarness({ exitOnGracefulKill = true, buildInfo = (dir) => ({ buil
     fileExists: () => true,
   });
 
-  return { supervisor, calls, children };
+  return { supervisor, calls, children, alive };
 }
 
 function summary(calls) {
@@ -95,6 +108,16 @@ test('spawn runs each exe from its own folder with a visible window', async () =
   assert.equal(spawn.exe, 'C:/Room/S1/RoomS1.exe');
   assert.equal(spawn.options.cwd.replace(/\\/g, '/'), 'C:/Room/S1');
   assert.equal(spawn.options.windowsHide, false);
+});
+
+// 不 detached 的話，Node 會把 Unity 放進「父程序結束就終止」的 job object：
+// agent 當機或重啟會讓現場整個黑掉（2026-10-13 辦公室演練實際發生）。
+test('Unity is started detached so it survives an agent restart', async () => {
+  const { supervisor, calls } = createHarness();
+
+  await supervisor.activate('s1');
+
+  assert.equal(calls.find(({ kind }) => kind === 'spawn').options.detached, true);
 });
 
 test('stopping asks politely first and does not force a child that exited', async () => {
@@ -234,4 +257,69 @@ test('a failed request does not block the next one', async () => {
   const result = await supervisor.activate('s1');
 
   assert.equal(result.started.length, 1);
+});
+
+// ---- 接管 agent 重啟前留下的 Unity ----
+
+const S2_RUNNING = [
+  { pid: 501, image: 'RoomS2.exe', commandLine: '"C:\Room\S2\RoomS2.exe" -roomRole ground -roomOscPort 9001' },
+  { pid: 502, image: 'RoomS2.exe', commandLine: '"C:\Room\S2\RoomS2.exe" -roomRole tables' },
+];
+
+test('ensure adopts a running profile instead of restarting it', async () => {
+  const { supervisor, calls } = createHarness({ running: S2_RUNNING });
+
+  const result = await supervisor.ensure('s2');
+
+  assert.deepEqual(result.started, []);
+  assert.deepEqual(result.adopted.map(({ name, pid }) => [name, pid]), [['s2-tables', 502], ['s2-ground', 501]]);
+  assert.equal(calls.some(({ kind }) => kind === 'spawn'), false);
+  assert.equal(calls.some(({ detail }) => detail && detail.startsWith('taskkill')), false);
+  assert.deepEqual(supervisor.status().running.map(({ name }) => name).sort(), ['s2-ground', 's2-tables']);
+});
+
+test('ensure restarts when only part of the profile is running', async () => {
+  const { supervisor, calls } = createHarness({ running: [S2_RUNNING[0]] });
+
+  const result = await supervisor.ensure('s2');
+
+  assert.equal(result.started.length, 2);
+  assert.ok(calls.some(({ detail }) => detail === 'taskkill /IM RoomS2.exe /T /F'));
+});
+
+test('ensure restarts when another profile is running', async () => {
+  const { supervisor } = createHarness({
+    running: [{ pid: 600, image: 'RoomS1.exe', commandLine: '"C:\Room\S1\RoomS1.exe"' }],
+  });
+
+  const result = await supervisor.ensure('s2');
+
+  assert.equal(result.started.length, 2);
+});
+
+test('an adopted process that disappears is reported as an unexpected exit', async () => {
+  const { supervisor, alive } = createHarness({ running: S2_RUNNING });
+  const exits = [];
+  supervisor.on('processExited', (event) => exits.push(event));
+  await supervisor.ensure('s2');
+
+  alive.delete(501);
+  supervisor.pollAdopted();
+
+  assert.deepEqual(exits, [{ profileId: 's2', name: 's2-ground', pid: 501, code: null }]);
+  assert.deepEqual(supervisor.status().running.map(({ name }) => name), ['s2-tables']);
+});
+
+test('stopping an adopted process uses its pid and waits for it to disappear', async () => {
+  const { supervisor, calls } = createHarness({ running: S2_RUNNING });
+  await supervisor.ensure('s2');
+  calls.length = 0;
+
+  await supervisor.activate('s1');
+
+  const summaryLines = summary(calls);
+  assert.ok(summaryLines.includes('exec:taskkill /PID 502'));
+  assert.ok(summaryLines.includes('exec:taskkill /PID 501'));
+  assert.equal(summaryLines.some((line) => line.startsWith('exec:taskkill /PID 50') && line.endsWith('/F')), false);
+  assert.deepEqual(supervisor.status().running.map(({ name }) => name), ['s1']);
 });
