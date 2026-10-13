@@ -1,0 +1,352 @@
+'use strict';
+
+// 投影方案（projection profile）的純邏輯：設定驗證、狀態檔遷移、以及送給
+// 控制台與 Unity 的兩種 view。這裡不碰網路與檔案，全部可以直接測試。
+
+const {
+  SEAT_COUNT,
+  PROFILE_ID_PATTERN,
+  normalizeGroundThemeId,
+} = require('./control-model');
+const { isValidSeatMode } = require('./interface/control-settings');
+
+const ROOM_ROLES = Object.freeze(['both', 'tables', 'ground']);
+const SEAT_ORDERS = Object.freeze(['direct', 'reversed']);
+// Unity 的 modeSceneNames 有 10 個場景（0 Mapping … 9 Black）。
+const MAX_CONTENT_MODE = 9;
+// 沒有 version 的狀態檔是 2026-07 版（九席、六區）的格式，屬於 s2。
+const LEGACY_PROFILE_ID = 's2';
+const DEFAULT_CONTENT_MODE = 1;
+
+const DEFAULT_AUTO_CYCLE = Object.freeze({
+  enabled: false,
+  interval: 10,
+  modes: [1, 2, 3, 4, 5],
+  currentIndex: 0,
+  remainingSeconds: 0,
+});
+
+function isPlainObject(value) {
+  return value !== null
+    && typeof value === 'object'
+    && !Array.isArray(value)
+    && [Object.prototype, null].includes(Object.getPrototypeOf(value));
+}
+
+function fail(message) {
+  throw new Error(`profiles.config.json: ${message}`);
+}
+
+function readContentModeList(value, field, profileId) {
+  if (value === undefined) {
+    return [];
+  }
+  if (!Array.isArray(value)
+    || !value.every((mode) => Number.isInteger(mode) && mode >= 0 && mode <= MAX_CONTENT_MODE)) {
+    fail(`profile "${profileId}" ${field} must list content modes from 0 to ${MAX_CONTENT_MODE}`);
+  }
+  return [...value];
+}
+
+function readStringMap(value, field, profileId) {
+  if (value === undefined) {
+    return {};
+  }
+  if (!isPlainObject(value) || !Object.values(value).every((label) => typeof label === 'string')) {
+    fail(`profile "${profileId}" ${field} must map numbers to labels`);
+  }
+  return { ...value };
+}
+
+function validateProfile(profileId, raw) {
+  if (!isPlainObject(raw)) {
+    fail(`profile "${profileId}" must be an object`);
+  }
+
+  if (typeof raw.label !== 'string' || raw.label.trim() === '') {
+    fail(`profile "${profileId}" label must be a nonempty string`);
+  }
+
+  if (!Array.isArray(raw.rooms)
+    || raw.rooms.length === 0
+    || !raw.rooms.every((role) => ROOM_ROLES.includes(role))
+    || new Set(raw.rooms).size !== raw.rooms.length) {
+    fail(`profile "${profileId}" rooms must list distinct roles from ${ROOM_ROLES.join(', ')}`);
+  }
+
+  if (!Number.isInteger(raw.seatCount) || raw.seatCount < 1 || raw.seatCount > SEAT_COUNT) {
+    fail(`profile "${profileId}" seatCount must be an integer from 1 to ${SEAT_COUNT}`);
+  }
+
+  if (!SEAT_ORDERS.includes(raw.seatOrder)) {
+    fail(`profile "${profileId}" seatOrder must be one of ${SEAT_ORDERS.join(', ')}`);
+  }
+
+  if (!Array.isArray(raw.seatModes)
+    || !raw.seatModes.every(isValidSeatMode)
+    || new Set(raw.seatModes).size !== raw.seatModes.length) {
+    fail(`profile "${profileId}" seatModes must list distinct known seat statuses`);
+  }
+  // 0 是座位的重置值；方案若沒有 0，重置與遷移時就沒有合法值可填。
+  if (!raw.seatModes.includes(0)) {
+    fail(`profile "${profileId}" seatModes must include 0`);
+  }
+
+  if (typeof raw.ground !== 'boolean') {
+    fail(`profile "${profileId}" ground must be true or false`);
+  }
+
+  if (!Number.isInteger(raw.defaultMaskId) || raw.defaultMaskId < 0) {
+    fail(`profile "${profileId}" defaultMaskId must be a nonnegative integer`);
+  }
+
+  if (typeof raw.readyTimeoutSec !== 'number' || !(raw.readyTimeoutSec > 0)) {
+    fail(`profile "${profileId}" readyTimeoutSec must be a positive number`);
+  }
+
+  if (typeof raw.settleSec !== 'number' || !(raw.settleSec >= 0)) {
+    fail(`profile "${profileId}" settleSec must be zero or more`);
+  }
+
+  return Object.freeze({
+    id: profileId,
+    label: raw.label,
+    rooms: Object.freeze([...raw.rooms]),
+    seatCount: raw.seatCount,
+    seatOrder: raw.seatOrder,
+    seatModes: Object.freeze([...raw.seatModes]),
+    seatModeLabels: Object.freeze(readStringMap(raw.seatModeLabels, 'seatModeLabels', profileId)),
+    seatOnlyInModes: Object.freeze(readContentModeList(raw.seatOnlyInModes, 'seatOnlyInModes', profileId)),
+    seatLockedInModes: Object.freeze(readContentModeList(raw.seatLockedInModes, 'seatLockedInModes', profileId)),
+    resetSeatsOnModes: Object.freeze(readContentModeList(raw.resetSeatsOnModes, 'resetSeatsOnModes', profileId)),
+    ground: raw.ground,
+    modeLabels: Object.freeze(readStringMap(raw.modeLabels, 'modeLabels', profileId)),
+    defaultMaskId: raw.defaultMaskId,
+    readyTimeoutMs: Math.round(raw.readyTimeoutSec * 1000),
+    settleMs: Math.round(raw.settleSec * 1000),
+  });
+}
+
+/**
+ * 驗證 profiles.config.json。madmapper 是已驗證過的 MadMapper 設定，
+ * 兩份檔案的方案 id 必須完全一致，否則某個方案切過去會沒有任何區域可開。
+ */
+function validateProfilesConfig(raw, madmapper, env = process.env) {
+  if (!isPlainObject(raw)) {
+    fail('must be a plain object');
+  }
+
+  const agent = raw.agent;
+  if (!isPlainObject(agent)) {
+    fail('agent must be an object');
+  }
+  if (typeof agent.url !== 'string' || !/^wss?:\/\/\S+$/.test(agent.url)) {
+    fail('agent url must start with ws:// or wss://');
+  }
+  const token = (env && typeof env.ROOM_AGENT_TOKEN === 'string' && env.ROOM_AGENT_TOKEN !== '')
+    ? env.ROOM_AGENT_TOKEN
+    : agent.token;
+  if (typeof token !== 'string' || token === '') {
+    fail('agent token must be a nonempty string (or set ROOM_AGENT_TOKEN)');
+  }
+  if (typeof agent.requestTimeoutSec !== 'number' || !(agent.requestTimeoutSec > 0)) {
+    fail('agent requestTimeoutSec must be a positive number');
+  }
+
+  if (!isPlainObject(raw.profiles) || Object.keys(raw.profiles).length === 0) {
+    fail('profiles must define at least one profile');
+  }
+
+  const ids = Object.keys(raw.profiles);
+  for (const profileId of ids) {
+    if (!PROFILE_ID_PATTERN.test(profileId)) {
+      fail(`profile id "${profileId}" must match ${PROFILE_ID_PATTERN}`);
+    }
+  }
+
+  const madmapperIds = Object.keys(madmapper.profiles);
+  for (const profileId of ids) {
+    if (!madmapperIds.includes(profileId)) {
+      fail(`profile "${profileId}" has no areas in madmapper.config.json`);
+    }
+  }
+  for (const profileId of madmapperIds) {
+    if (!ids.includes(profileId)) {
+      fail(`madmapper.config.json defines profile "${profileId}" that is not listed here`);
+    }
+  }
+
+  if (!ids.includes(raw.defaultProfile)) {
+    fail(`defaultProfile "${raw.defaultProfile}" is not one of ${ids.join(', ')}`);
+  }
+
+  const byId = {};
+  for (const profileId of ids) {
+    byId[profileId] = validateProfile(profileId, raw.profiles[profileId]);
+  }
+
+  return Object.freeze({
+    agent: Object.freeze({
+      url: agent.url,
+      token,
+      requestTimeoutMs: Math.round(agent.requestTimeoutSec * 1000),
+    }),
+    defaultProfile: raw.defaultProfile,
+    ids: Object.freeze(ids),
+    byId: Object.freeze(byId),
+  });
+}
+
+/** 9 格、控制台順序（index 0 = 座位 1）；方案不允許的值與超出座位數的格子一律為 0。 */
+function normalizeProfileTableModes(value, profile) {
+  const source = Array.isArray(value) ? value : [];
+  return Array.from({ length: SEAT_COUNT }, (_, index) => {
+    const mode = source[index];
+    return index < profile.seatCount && profile.seatModes.includes(mode) ? mode : 0;
+  });
+}
+
+function createDefaultProfileState(profile, madmapperProfile) {
+  return {
+    contentMode: DEFAULT_CONTENT_MODE,
+    maskMode: profile.defaultMaskId,
+    groundThemeId: 'none',
+    tableModes: new Array(SEAT_COUNT).fill(0),
+    surfaceStates: Object.fromEntries(
+      madmapperProfile.areas.map(({ name, defaultOn }) => [name, defaultOn]),
+    ),
+  };
+}
+
+function normalizeProfileState(raw, profile, madmapperProfile) {
+  const defaults = createDefaultProfileState(profile, madmapperProfile);
+  const source = isPlainObject(raw) ? raw : {};
+  const surfaces = isPlainObject(source.surfaceStates) ? source.surfaceStates : {};
+
+  return {
+    contentMode: Number.isInteger(source.contentMode)
+      && source.contentMode >= 0
+      && source.contentMode <= MAX_CONTENT_MODE
+      ? source.contentMode
+      : defaults.contentMode,
+    maskMode: Number.isInteger(source.maskMode) && source.maskMode >= 0
+      ? source.maskMode
+      : defaults.maskMode,
+    groundThemeId: profile.ground ? normalizeGroundThemeId(source.groundThemeId) : 'none',
+    tableModes: normalizeProfileTableModes(source.tableModes, profile),
+    surfaceStates: Object.fromEntries(
+      madmapperProfile.areas.map(({ name, defaultOn }) => [
+        name,
+        Object.prototype.hasOwnProperty.call(surfaces, name) ? surfaces[name] === true : defaultOn,
+      ]),
+    ),
+  };
+}
+
+function normalizeSwitchState(raw) {
+  const source = isPlainObject(raw) ? raw : {};
+  const base = {
+    status: 'idle',
+    from: null,
+    to: null,
+    step: null,
+    startedAt: null,
+    error: null,
+  };
+
+  if (source.status === 'switching') {
+    // Node 在切換途中重啟：不知道 Unity 停在哪一步，交給操作者決定重試或回到原方案。
+    return {
+      ...base,
+      status: 'failed',
+      from: source.from ?? null,
+      to: source.to ?? null,
+      step: source.step ?? null,
+      startedAt: source.startedAt ?? null,
+      error: 'Node 在切換途中重新啟動',
+    };
+  }
+
+  if (source.status === 'failed') {
+    return {
+      ...base,
+      status: 'failed',
+      from: source.from ?? null,
+      to: source.to ?? null,
+      step: source.step ?? null,
+      startedAt: source.startedAt ?? null,
+      error: typeof source.error === 'string' ? source.error : '切換失敗',
+    };
+  }
+
+  return base;
+}
+
+function normalizeAutoCycle(raw) {
+  const source = isPlainObject(raw) ? raw : {};
+  return {
+    ...DEFAULT_AUTO_CYCLE,
+    modes: [...DEFAULT_AUTO_CYCLE.modes],
+    ...source,
+    // 與原本的伺服器相同：載入時一律停用，避免重啟後自己開始切背景。
+    enabled: false,
+    remainingSeconds: 0,
+  };
+}
+
+/**
+ * 把磁碟上的狀態檔轉成 v3。沒有 version 的舊檔整份屬於 2026-07 版（s2），
+ * 其他方案用預設值；工作燈的狀態從舊的 surfaceStates 搬到 lightStates。
+ */
+function migrateSystemState(raw, { profiles, madmapper }) {
+  const source = isPlainObject(raw) ? raw : {};
+  const isV3 = source.version === 3;
+
+  let profileSources;
+  let lightSource;
+  let activeProfile;
+  let switchSource;
+
+  if (isV3) {
+    profileSources = isPlainObject(source.profiles) ? source.profiles : {};
+    lightSource = source.lightStates;
+    activeProfile = source.activeProfile;
+    switchSource = source.switch;
+  } else {
+    const legacyId = profiles.ids.includes(LEGACY_PROFILE_ID) ? LEGACY_PROFILE_ID : profiles.defaultProfile;
+    profileSources = { [legacyId]: source };
+    lightSource = source.surfaceStates;
+    activeProfile = legacyId;
+    switchSource = null;
+  }
+
+  const lights = isPlainObject(lightSource) ? lightSource : {};
+
+  return {
+    version: 3,
+    activeProfile: profiles.ids.includes(activeProfile) ? activeProfile : profiles.defaultProfile,
+    switch: normalizeSwitchState(switchSource),
+    profiles: Object.fromEntries(profiles.ids.map((profileId) => [
+      profileId,
+      normalizeProfileState(
+        profileSources[profileId],
+        profiles.byId[profileId],
+        madmapper.profiles[profileId],
+      ),
+    ])),
+    lightStates: Object.fromEntries(madmapper.lights.map(({ name }) => [name, lights[name] === true])),
+    autoCycle: normalizeAutoCycle(source.autoCycle),
+  };
+}
+
+module.exports = {
+  ROOM_ROLES,
+  SEAT_ORDERS,
+  MAX_CONTENT_MODE,
+  LEGACY_PROFILE_ID,
+  validateProfilesConfig,
+  normalizeProfileTableModes,
+  createDefaultProfileState,
+  normalizeProfileState,
+  migrateSystemState,
+};
