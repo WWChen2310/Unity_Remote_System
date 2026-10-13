@@ -320,6 +320,20 @@ test('an unexpected Unity exit reaches the console as a room status update', asy
   assert.equal(update.lastExit.profileId, 's2');
 });
 
+test('restarting the profile after a crash clears the exit warning', async (t) => {
+  const site = await startAndSettle(t);
+  const consoleClient = await site.connectConsole();
+  site.agent.crash(0);
+  await consoleClient.waitFor((m) => m.type === 'roomStatusUpdate' && m.lastExit);
+  consoleClient.clear();
+
+  consoleClient.send({ type: 'restartProfile' });
+
+  const done = await consoleClient.waitFor(isIdleOn('s2'));
+  assert.equal(done.state.lastExit, null);
+  assert.equal(done.state.rooms.length, 2);
+});
+
 test('a restart while switching is persisted as failed', async (t) => {
   const first = await startTestSite(t, { hangActivate: true });
   first.agent.isConnected = true;

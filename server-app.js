@@ -247,7 +247,11 @@ function startServer({
           publishToConsoles({ type: 'profileSwitchUpdate', activeProfile: state.activeProfile, switch: { ...state.switch } });
         }
       },
-      switchCompleted: () => publishFullState(),
+      // 切換或重新啟動成功，代表目前方案的 Unity 都在線上，先前的當機警告可以清掉。
+      switchCompleted: () => {
+        lastExit = null;
+        publishFullState();
+      },
     },
   });
 
