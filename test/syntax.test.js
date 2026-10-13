@@ -17,6 +17,7 @@ const SHIPPED_SOURCES = [
   'profile-model.js',
   'room-presence.js',
   'agent-client.js',
+  'profile-switcher.js',
   path.join('tools', 'agent-ping.js'),
   'ecosystem.config.js',
   path.join('interface', 'control-settings.js'),
