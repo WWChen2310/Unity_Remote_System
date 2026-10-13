@@ -9,7 +9,8 @@
     "simple": "node server.js",
     "web": "node web-server.js",
     "test": "node --test",
-    "agent": "node agent/room-agent.js"
+    "agent": "node agent/room-agent.js",
+    "agent:ping": "node tools/agent-ping.js"
   },
   "keywords": [
     "unity",
