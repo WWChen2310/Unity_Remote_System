@@ -5,12 +5,16 @@ const assert = require('node:assert/strict');
 
 const { validateMadmapperConfig } = require('../control-model');
 
-test('MadMapper config defines the required surface name and address mapping', () => {
-  const config = require('../madmapper.config.json');
-  const validated = validateMadmapperConfig(config);
+const S1_AREA_NAMES = [
+  'Main-1', 'T1-1', 'T2-1', 'T3-1', 'T4-1', 'T5-1', 'T6-1', 'T7-1',
+  'Main-2', 'T2-2', 'T3-2', 'T4-2', 'T5-2', 'T6-2', 'T7-2',
+];
+
+test('MadMapper config keeps the six s2 surfaces at their existing addresses', () => {
+  const validated = validateMadmapperConfig(require('../madmapper.config.json'));
 
   assert.deepEqual(
-    validated.areas.map(({ name, oscAddress }) => ({ name, oscAddress })),
+    validated.profiles.s2.areas.map(({ name, oscAddress }) => ({ name, oscAddress })),
     [
       { name: 'Main', oscAddress: '/surfaces/Main/opacity' },
       { name: 'T1', oscAddress: '/surfaces/T1/opacity' },
@@ -19,6 +23,26 @@ test('MadMapper config defines the required surface name and address mapping', (
       { name: 'T4', oscAddress: '/surfaces/T4/opacity' },
       { name: 'Ground', oscAddress: '/surfaces/Ground/opacity' },
     ],
+  );
+});
+
+// s1 的 15 個名稱來自 2026-03 版的 Node（SURFACES_SETTINGS），MadMapper 的 s1 拼接檔用的就是這組。
+// 合併後的 MadMapper 專案必須用完全相同的名稱，否則按了沒反應而且沒有錯誤。
+test('MadMapper config restores the fifteen s1 surfaces in two groups', () => {
+  const validated = validateMadmapperConfig(require('../madmapper.config.json'));
+  const { areas } = validated.profiles.s1;
+
+  assert.deepEqual(areas.map(({ name }) => name), S1_AREA_NAMES);
+  for (const { name, oscAddress } of areas) {
+    assert.equal(oscAddress, `/surfaces/${name}/opacity`);
+  }
+  assert.deepEqual(
+    areas.filter(({ defaultOn }) => defaultOn).map(({ name }) => name),
+    S1_AREA_NAMES.filter((name) => name.endsWith('-1')),
+  );
+  assert.deepEqual(
+    [...new Set(areas.map(({ group }) => group))],
+    ['模式一', '模式二'],
   );
 });
 
@@ -36,13 +60,15 @@ test('work light names in the console match the shipped MadMapper config', () =>
   }
 });
 
-test('work lights and areas share one OSC target map', () => {
+test('every profile reaches its own areas and all work lights through one target map', () => {
   const validated = validateMadmapperConfig(require('../madmapper.config.json'));
 
-  for (const { name } of [...validated.areas, ...validated.lights]) {
-    assert.ok(
-      Object.prototype.hasOwnProperty.call(validated.targetMap, name),
-      `${name} must be reachable through targetMap`,
-    );
+  for (const profile of Object.values(validated.profiles)) {
+    for (const { name } of [...profile.areas, ...validated.lights]) {
+      assert.ok(
+        Object.prototype.hasOwnProperty.call(profile.targetMap, name),
+        `${name} must be reachable through targetMap`,
+      );
+    }
   }
 });

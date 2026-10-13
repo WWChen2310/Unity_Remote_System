@@ -29,14 +29,24 @@ function createValidConfig() {
     ip: '127.0.0.1',
     port: 8010,
     localPort: 8011,
-    areas: [
-      { name: 'Main', oscAddress: '/surfaces/Main' },
-      { name: 'T1', oscAddress: '/surfaces/T1' },
-      { name: 'T2', oscAddress: '/surfaces/T2' },
-      { name: 'T3', oscAddress: '/surfaces/T3' },
-      { name: 'T4', oscAddress: '/surfaces/T4' },
-      { name: 'Ground', oscAddress: '/surfaces/Ground' },
-    ],
+    profiles: {
+      s1: {
+        areas: [
+          { name: 'Main-1', group: '模式一', oscAddress: '/surfaces/Main-1', defaultOn: true },
+          { name: 'Main-2', group: '模式二', oscAddress: '/surfaces/Main-2' },
+        ],
+      },
+      s2: {
+        areas: [
+          { name: 'Main', oscAddress: '/surfaces/Main' },
+          { name: 'T1', oscAddress: '/surfaces/T1' },
+          { name: 'T2', oscAddress: '/surfaces/T2' },
+          { name: 'T3', oscAddress: '/surfaces/T3' },
+          { name: 'T4', oscAddress: '/surfaces/T4' },
+          { name: 'Ground', oscAddress: '/surfaces/Ground' },
+        ],
+      },
+    },
     lights: [
       { name: 'Light1', oscAddress: '/surfaces/Light1' },
       { name: 'Light2', oscAddress: '/surfaces/Light2' },
@@ -83,23 +93,43 @@ test('isValidTableIndex accepts only integer indexes from zero through eight', (
   assert.equal(isValidTableIndex(1.5), false);
 });
 
-test('validateMadmapperConfig returns normalized connection and area lookups', () => {
+test('validateMadmapperConfig returns connection settings and per-profile lookups', () => {
   const config = createValidConfig();
   const result = validateMadmapperConfig(config);
 
   assert.equal(result.ip, config.ip);
   assert.equal(result.port, config.port);
   assert.equal(result.localPort, config.localPort);
-  assert.deepEqual(result.areas, config.areas);
+  assert.deepEqual(Object.keys(result.profiles).sort(), ['s1', 's2']);
   assert.deepEqual(
-    Object.keys(result.areaMap).sort(),
+    Object.keys(result.profiles.s2.areaMap).sort(),
     ['Ground', 'Main', 'T1', 'T2', 'T3', 'T4'].sort(),
   );
-  assert.equal(result.areaMap.Main.oscAddress, '/surfaces/Main');
+  assert.equal(result.profiles.s2.areaMap.Main.oscAddress, '/surfaces/Main');
+});
+
+test('validateMadmapperConfig builds one target map per profile with the lights in each', () => {
+  const { profiles } = validateMadmapperConfig(createValidConfig());
+
+  assert.ok(profiles.s1.targetMap['Main-1']);
+  assert.ok(profiles.s1.targetMap.Light1, 'work lights are reachable from every profile');
+  assert.ok(profiles.s2.targetMap.Light1);
+  assert.equal(profiles.s2.targetMap['Main-1'], undefined);
+  assert.equal(profiles.s1.targetMap.Main, undefined);
+});
+
+test('validateMadmapperConfig keeps optional group and defaultOn', () => {
+  const { profiles } = validateMadmapperConfig(createValidConfig());
+
+  assert.equal(profiles.s1.areaMap['Main-1'].group, '模式一');
+  assert.equal(profiles.s1.areaMap['Main-1'].defaultOn, true);
+  assert.equal(profiles.s1.areaMap['Main-2'].defaultOn, false);
+  assert.equal(profiles.s2.areaMap.Main.group, null);
+  assert.equal(profiles.s2.areaMap.Main.defaultOn, false);
 });
 
 test('normalizeSurfaceStates keeps configured names and accepts only literal true', () => {
-  const { areaMap } = validateMadmapperConfig(createValidConfig());
+  const { areaMap } = validateMadmapperConfig(createValidConfig()).profiles.s2;
 
   assert.deepEqual(
     normalizeSurfaceStates(
@@ -127,7 +157,7 @@ test('normalizeSurfaceStates keeps configured names and accepts only literal tru
 });
 
 test('createMadmapperOscMessage uses the configured address and float values', () => {
-  const { areaMap } = validateMadmapperConfig(createValidConfig());
+  const { areaMap } = validateMadmapperConfig(createValidConfig()).profiles.s2;
 
   assert.deepEqual(createMadmapperOscMessage(areaMap, 'T3', true), {
     address: '/surfaces/T3',
@@ -143,7 +173,7 @@ test('createMadmapperOscMessage uses the configured address and float values', (
 
 test('validateMadmapperConfig rejects duplicate area names', () => {
   const config = createValidConfig();
-  config.areas[1] = { name: 'Main', oscAddress: '/surfaces/OtherMain' };
+  config.profiles.s2.areas[1] = { name: 'Main', oscAddress: '/surfaces/OtherMain' };
 
   assert.throws(
     () => validateMadmapperConfig(config),
@@ -151,19 +181,62 @@ test('validateMadmapperConfig rejects duplicate area names', () => {
   );
 });
 
-test('validateMadmapperConfig rejects a missing required area', () => {
+test('validateMadmapperConfig rejects an area name used by two profiles', () => {
   const config = createValidConfig();
-  config.areas = config.areas.filter(({ name }) => name !== 'Ground');
+  config.profiles.s1.areas.push({ name: 'Main', oscAddress: '/surfaces/Main' });
 
   assert.throws(
     () => validateMadmapperConfig(config),
-    /missing.*Ground|Ground.*required/i,
+    /duplicate.*Main|Main.*duplicate/i,
   );
+});
+
+test('validateMadmapperConfig rejects an area that reuses a work light name', () => {
+  const config = createValidConfig();
+  config.profiles.s2.areas.push({ name: 'Light1', oscAddress: '/surfaces/Light1b' });
+
+  assert.throws(
+    () => validateMadmapperConfig(config),
+    /duplicate.*Light1|Light1.*duplicate/i,
+  );
+});
+
+test('validateMadmapperConfig rejects a profile without areas', () => {
+  const config = createValidConfig();
+  config.profiles.s1.areas = [];
+
+  assert.throws(() => validateMadmapperConfig(config), /s1.*at least one area/i);
+});
+
+test('validateMadmapperConfig rejects the legacy top-level areas list', () => {
+  const config = createValidConfig();
+  config.areas = config.profiles.s2.areas;
+  delete config.profiles;
+
+  assert.throws(() => validateMadmapperConfig(config), /profiles.*Readme/i);
+});
+
+test('validateMadmapperConfig rejects profile ids the Unity builds cannot report', () => {
+  const config = createValidConfig();
+  config.profiles['S 1'] = config.profiles.s1;
+  delete config.profiles.s1;
+
+  assert.throws(() => validateMadmapperConfig(config), /profile id/i);
+});
+
+test('validateMadmapperConfig rejects a non-string group and a non-boolean defaultOn', () => {
+  const groupConfig = createValidConfig();
+  groupConfig.profiles.s1.areas[0].group = 1;
+  assert.throws(() => validateMadmapperConfig(groupConfig), /group/i);
+
+  const defaultOnConfig = createValidConfig();
+  defaultOnConfig.profiles.s1.areas[0].defaultOn = 'yes';
+  assert.throws(() => validateMadmapperConfig(defaultOnConfig), /defaultOn/i);
 });
 
 test('validateMadmapperConfig rejects OSC addresses that do not start with a slash', () => {
   const config = createValidConfig();
-  config.areas[2].oscAddress = 'surfaces/T2';
+  config.profiles.s2.areas[2].oscAddress = 'surfaces/T2';
 
   assert.throws(
     () => validateMadmapperConfig(config),
