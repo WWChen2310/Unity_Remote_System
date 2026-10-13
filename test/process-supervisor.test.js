@@ -106,10 +106,23 @@ test('stopping asks politely first and does not force a child that exited', asyn
 
   // 已經結束就不用再等寬限時間。
   assert.deepEqual(summary(calls), [
-    'exec:taskkill /PID 100 /T',
+    'exec:taskkill /PID 100',
     'exec:taskkill /IM RoomS1.exe /T /F',
     'exec:taskkill /IM RoomS2.exe /T /F',
   ]);
+});
+
+// 溫和關閉不可加 /T：Unity 的子程序 UnityCrashHandler64 只能強制結束，
+// 加了 /T 會讓 taskkill 整棵樹都拒絕處理，Unity 根本收不到關閉訊號（2026-10-13 實測）。
+test('the polite request targets only the Unity process, not its crash handler child', async () => {
+  const { supervisor, calls } = createHarness();
+  await supervisor.activate('s1');
+  calls.length = 0;
+
+  await supervisor.stop();
+
+  const polite = calls.find(({ detail }) => detail && detail.startsWith('taskkill /PID'));
+  assert.equal(polite.detail, 'taskkill /PID 100');
 });
 
 test('stopping forces a child that ignored the polite request', async () => {
@@ -120,7 +133,7 @@ test('stopping forces a child that ignored the polite request', async () => {
   await supervisor.stop();
 
   assert.deepEqual(summary(calls), [
-    'exec:taskkill /PID 100 /T',
+    'exec:taskkill /PID 100',
     'delay:5000',
     'exec:taskkill /PID 100 /T /F',
     'exec:taskkill /IM RoomS1.exe /T /F',
@@ -172,7 +185,7 @@ test('ensure re-activates when one of two s2 processes has died', async () => {
   const result = await supervisor.ensure('s2');
 
   assert.deepEqual(result.started.map(({ name }) => name), ['s2-tables', 's2-ground']);
-  assert.ok(summary(calls).includes('exec:taskkill /PID 101 /T'), 'the survivor is stopped first');
+  assert.ok(summary(calls).includes('exec:taskkill /PID 101'), 'the survivor is stopped first');
 });
 
 test('ensure starts a profile when nothing is running', async () => {

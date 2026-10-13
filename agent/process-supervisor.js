@@ -36,7 +36,7 @@ function defaultReadBuildInfo(directory) {
  * 避免兩次切換交錯，留下兩個方案的 process 同時搶 UDP 9000。
  *
  * 停止順序：先 taskkill /PID（送 WM_CLOSE，讓 Unity 正常關閉 WebSocket 與 Spout），
- * 等寬限時間後還沒結束才加 /F；最後對所有設定中的 exe 名稱清一次殘留，
+ * 等寬限時間後還沒結束才用 /T /F 連同子程序強制結束；最後對所有設定中的 exe 名稱清一次殘留，
  * 包括 agent 重啟前留下、它已經不認得的 process。
  */
 class ProcessSupervisor extends EventEmitter {
@@ -223,7 +223,9 @@ class ProcessSupervisor extends EventEmitter {
       return;
     }
 
-    await this.execFn('taskkill', ['/PID', String(entry.pid), '/T']);
+    // 只送給 Unity 本身，不加 /T：子程序 UnityCrashHandler64 只能強制結束，
+    // 加了 /T 會讓 taskkill 整棵樹都拒絕處理，Unity 收不到關閉訊號（實測不加 /T 約 2.6 秒正常關閉）。
+    await this.execFn('taskkill', ['/PID', String(entry.pid)]);
     if (entry.exited) {
       return;
     }
