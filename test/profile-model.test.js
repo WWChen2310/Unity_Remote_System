@@ -7,6 +7,11 @@ const { validateMadmapperConfig } = require('../control-model');
 const {
   validateProfilesConfig,
   migrateSystemState,
+  toUnityTableModes,
+  createConsoleState,
+  createRoomState,
+  viewKindForClient,
+  classifyClient,
 } = require('../profile-model');
 
 const madmapper = validateMadmapperConfig(require('../madmapper.config.json'));
@@ -195,4 +200,105 @@ test('surface keys that no longer exist are dropped and new ones get their defau
   assert.equal(state.profiles.s1.surfaceStates['Main-1'], false);
   assert.equal(state.profiles.s1.surfaceStates['T1-1'], true);
   assert.equal('Old-9' in state.profiles.s1.surfaceStates, false);
+});
+
+// ---- views ------------------------------------------------------------------
+
+function viewContext() {
+  const ctx = context();
+  const state = migrateSystemState({}, ctx);
+  return { ...ctx, state, byId: ctx.profiles.byId };
+}
+
+test('toUnityTableModes passes nine direct seats through for s2', () => {
+  const { byId } = viewContext();
+
+  assert.deepEqual(toUnityTableModes(byId.s2, [1, 2, 3, 4, 0, 0, 0, 0, 1]), [1, 2, 3, 4, 0, 0, 0, 0, 1]);
+});
+
+test('toUnityTableModes reverses eight seats for s1 and drops lights-on', () => {
+  const { byId } = viewContext();
+
+  // 座位 1 → Region 7、座位 2 → Region 6 …；s1 沒有開燈（4），第 9 格不送。
+  assert.deepEqual(toUnityTableModes(byId.s1, [1, 2, 3, 4, 0, 0, 0, 0, 2]), [0, 0, 0, 0, 0, 3, 2, 1]);
+});
+
+test('toUnityTableModes treats a missing array as all zeros', () => {
+  const { byId } = viewContext();
+
+  assert.deepEqual(toUnityTableModes(byId.s1, undefined), [0, 0, 0, 0, 0, 0, 0, 0]);
+});
+
+test('createRoomState sends s1 eight translated seats and no ground theme', () => {
+  const { state, byId } = viewContext();
+  state.profiles.s1.contentMode = 8;
+  state.profiles.s1.tableModes[0] = 1;
+
+  const room = createRoomState(state, byId.s1);
+
+  assert.deepEqual(room, {
+    contentMode: 8,
+    maskMode: 1,
+    tableModes: [0, 0, 0, 0, 0, 0, 0, 1],
+  });
+});
+
+test('createRoomState sends s2 nine direct seats and its ground theme', () => {
+  const { state, byId } = viewContext();
+  state.profiles.s2.groundThemeId = 'watergrass';
+  state.profiles.s2.tableModes[8] = 4;
+
+  const room = createRoomState(state, byId.s2);
+
+  assert.equal(room.groundThemeId, 'watergrass');
+  assert.deepEqual(room.tableModes, [0, 0, 0, 0, 0, 0, 0, 0, 4]);
+});
+
+test('createConsoleState exposes only the active areas plus the work lights', () => {
+  const ctx = viewContext();
+  const state = { ...ctx.state, activeProfile: 's1' };
+
+  const view = createConsoleState(state, { ...ctx, agentConnected: true, rooms: [{ build: 's1', role: 'both' }] });
+
+  assert.equal(view.activeProfile, 's1');
+  assert.ok('Main-1' in view.surfaceStates);
+  assert.ok('Light1' in view.surfaceStates);
+  assert.equal('Main' in view.surfaceStates, false);
+  assert.equal(view.tableModes.length, 9);
+  assert.equal(view.groundThemeId, 'none');
+  assert.deepEqual(view.agent, { connected: true });
+  assert.deepEqual(view.rooms, [{ build: 's1', role: 'both' }]);
+  assert.equal(view.switch.status, 'idle');
+  assert.deepEqual(view.profileCatalog.map(({ id }) => id), ['s1', 's2']);
+  assert.deepEqual(view.profileCatalog[0].areas[0], { name: 'Main-1', group: '模式一' });
+  assert.equal(view.profileCatalog[0].seatCount, 8);
+  assert.deepEqual(view.profileCatalog[0].seatModeLabels, { 0: '預設' });
+  assert.equal(view.profileCatalog[1].ground, true);
+});
+
+test('createConsoleState does not leak mutable references into the persisted state', () => {
+  const ctx = viewContext();
+  const view = createConsoleState(ctx.state, ctx);
+
+  view.tableModes[0] = 3;
+  view.surfaceStates.Main = true;
+
+  assert.equal(ctx.state.profiles.s2.tableModes[0], 0);
+  assert.equal(ctx.state.profiles.s2.surfaceStates.Main, false);
+});
+
+test('viewKindForClient routes rooms by build and everyone else to the console view', () => {
+  assert.equal(viewKindForClient({ kind: 'room', build: 's1' }, 's1'), 'room');
+  assert.equal(viewKindForClient({ kind: 'room', build: 's2' }, 's1'), null);
+  assert.equal(viewKindForClient({ kind: 'web' }, 's1'), 'console');
+  assert.equal(viewKindForClient({ kind: 'tracker' }, 's1'), 'console');
+  assert.equal(viewKindForClient({ kind: 'unknown' }, 's1'), 'console');
+});
+
+test('classifyClient maps the legacy unity name to the tracker and room to Unity content', () => {
+  assert.equal(classifyClient({ clientType: 'unity' }), 'tracker');
+  assert.equal(classifyClient({ clientType: 'room' }), 'room');
+  assert.equal(classifyClient({ clientType: 'web' }), 'web');
+  assert.equal(classifyClient({ clientType: 'something' }), 'unknown');
+  assert.equal(classifyClient({}), 'unknown');
 });

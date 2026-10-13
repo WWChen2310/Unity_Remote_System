@@ -339,6 +339,106 @@ function migrateSystemState(raw, { profiles, madmapper }) {
   };
 }
 
+// ---- views -----------------------------------------------------------------
+
+/**
+ * 把控制台順序的座位（index 0 = 座位 1）轉成這個 build 要的陣列。
+ * s1 只認長度剛好 8 的陣列，而且舊控制台送的是反轉順序（座位 1 → Region 7）。
+ */
+function toUnityTableModes(profile, stored) {
+  const source = Array.isArray(stored) ? stored : [];
+  const result = new Array(profile.seatCount).fill(0);
+  for (let seat = 0; seat < profile.seatCount; seat += 1) {
+    const value = profile.seatModes.includes(source[seat]) ? source[seat] : 0;
+    const region = profile.seatOrder === 'reversed' ? profile.seatCount - 1 - seat : seat;
+    result[region] = value;
+  }
+  return result;
+}
+
+/** 控制台渲染各卡片所需的方案描述。 */
+function createProfileCatalog(profiles, madmapper) {
+  return profiles.ids.map((profileId) => {
+    const profile = profiles.byId[profileId];
+    return {
+      id: profile.id,
+      label: profile.label,
+      rooms: [...profile.rooms],
+      seatCount: profile.seatCount,
+      seatModes: [...profile.seatModes],
+      seatModeLabels: { ...profile.seatModeLabels },
+      seatOnlyInModes: [...profile.seatOnlyInModes],
+      seatLockedInModes: [...profile.seatLockedInModes],
+      ground: profile.ground,
+      modeLabels: { ...profile.modeLabels },
+      areas: madmapper.profiles[profileId].areas.map(({ name, group }) => ({ name, group })),
+    };
+  });
+}
+
+/**
+ * 送給控制台、追蹤端與尚未表明身分的連線。tableModes 固定 9 格、控制台順序：
+ * s1 Unity 若在握手前先收到這份，會因長度不是 8 而忽略座位，不會以錯誤順序閃一下。
+ */
+function createConsoleState(state, { profiles, madmapper, agentConnected = false, rooms = [] }) {
+  const active = state.profiles[state.activeProfile];
+  return {
+    activeProfile: state.activeProfile,
+    switch: { ...state.switch },
+    agent: { connected: agentConnected },
+    rooms: rooms.map(({ build, role }) => ({ build, role })),
+    contentMode: active.contentMode,
+    maskMode: active.maskMode,
+    groundThemeId: active.groundThemeId,
+    tableModes: [...active.tableModes],
+    surfaceStates: { ...active.surfaceStates, ...state.lightStates },
+    autoCycle: { ...state.autoCycle, modes: [...(state.autoCycle.modes || [])] },
+    profileCatalog: createProfileCatalog(profiles, madmapper),
+  };
+}
+
+/** 送給 build 與目前方案相同的 Unity。沒有地面內容的方案不帶 groundThemeId。 */
+function createRoomState(state, profile) {
+  const profileState = state.profiles[profile.id];
+  const room = {
+    contentMode: profileState.contentMode,
+    maskMode: profileState.maskMode,
+    tableModes: toUnityTableModes(profile, profileState.tableModes),
+  };
+  if (profile.ground) {
+    room.groundThemeId = profileState.groundThemeId;
+  }
+  return room;
+}
+
+/**
+ * 這個連線該收哪一種 view。非目前方案的 Unity 什麼都不送：
+ * 它正在被關掉，或是有人手動開錯了 build，送過去只會讓它切到別的方案的背景。
+ */
+function viewKindForClient(clientInfo, activeProfile) {
+  if (clientInfo && clientInfo.kind === 'room') {
+    return clientInfo.build === activeProfile ? 'room' : null;
+  }
+  return 'console';
+}
+
+/**
+ * 依 clientType 分類。追蹤端（OrbbecObjectTracking）歷來自稱 "unity"，
+ * 內容主程式改用 "room"，兩者才分得開。
+ */
+function classifyClient(message) {
+  switch (message && message.clientType) {
+    case 'room':
+      return 'room';
+    case 'web':
+      return 'web';
+    case 'unity':
+      return 'tracker';
+    default:
+      return 'unknown';
+  }
+}
+
 module.exports = {
   ROOM_ROLES,
   SEAT_ORDERS,
@@ -349,4 +449,10 @@ module.exports = {
   createDefaultProfileState,
   normalizeProfileState,
   migrateSystemState,
+  toUnityTableModes,
+  createProfileCatalog,
+  createConsoleState,
+  createRoomState,
+  viewKindForClient,
+  classifyClient,
 };
