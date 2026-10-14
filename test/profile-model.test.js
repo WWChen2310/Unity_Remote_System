@@ -13,6 +13,7 @@ const {
   viewKindForClient,
   classifyClient,
 } = require('../profile-model');
+const { DEFAULT_LOGO } = require('../logo-model');
 
 const madmapper = validateMadmapperConfig(require('../madmapper.config.json'));
 
@@ -240,6 +241,7 @@ test('createRoomState sends s1 eight translated seats and no ground theme', () =
     contentMode: 8,
     maskMode: 1,
     tableModes: [0, 0, 0, 0, 0, 0, 0, 1],
+    logo: { ...DEFAULT_LOGO },
   });
 });
 

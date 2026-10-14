@@ -15,6 +15,7 @@ const SHIPPED_SOURCES = [
   'integrated-server.js',
   'control-model.js',
   'profile-model.js',
+  'logo-model.js',
   'room-presence.js',
   'agent-client.js',
   'profile-switcher.js',
