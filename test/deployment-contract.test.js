@@ -12,33 +12,37 @@ function readUtf8(relativePath) {
 }
 
 test('deployment JSON files parse successfully', () => {
-  assert.doesNotThrow(() => JSON.parse(readUtf8('madmapper.config.json')));
-  assert.doesNotThrow(() => JSON.parse(readUtf8('system_state.json')));
+  for (const file of ['madmapper.config.json', 'profiles.config.json', 'system_state.json', 'agent/agent.config.json']) {
+    assert.doesNotThrow(() => JSON.parse(readUtf8(file)), file);
+  }
 });
 
-test('persisted state has the nine-seat and six-surface deployment shape', () => {
+test('persisted state is v3 with one entry per projection profile', () => {
+  const { validateMadmapperConfig } = require('../control-model');
+  const { validateProfilesConfig } = require('../profile-model');
+  const madmapper = validateMadmapperConfig(JSON.parse(readUtf8('madmapper.config.json')));
+  const profiles = validateProfilesConfig(JSON.parse(readUtf8('profiles.config.json')), madmapper, {});
   const state = JSON.parse(readUtf8('system_state.json'));
 
-  assert.ok(Array.isArray(state.tableModes));
-  assert.equal(state.tableModes.length, 9);
-  assert.ok(
-    state.tableModes.every(
-      (value) => Number.isInteger(value) && value >= 0 && value <= 3,
-    ),
-  );
-  assert.deepEqual(Object.keys(state.surfaceStates), [
-    'Main',
-    'T1',
-    'T2',
-    'T3',
-    'T4',
-    'Ground',
-  ]);
-  assert.ok(
-    Object.values(state.surfaceStates).every(
-      (value) => typeof value === 'boolean',
-    ),
-  );
+  assert.equal(state.version, 3);
+  assert.ok(profiles.ids.includes(state.activeProfile));
+  assert.equal(state.switch.status, 'idle');
+  assert.deepEqual(Object.keys(state.profiles), profiles.ids);
+
+  for (const profileId of profiles.ids) {
+    const profileState = state.profiles[profileId];
+    const profile = profiles.byId[profileId];
+    assert.equal(profileState.tableModes.length, 9, profileId);
+    assert.ok(profileState.tableModes.every((value) => profile.seatModes.includes(value)), profileId);
+    assert.deepEqual(
+      Object.keys(profileState.surfaceStates),
+      madmapper.profiles[profileId].areas.map(({ name }) => name),
+      profileId,
+    );
+    assert.ok(Object.values(profileState.surfaceStates).every((value) => typeof value === 'boolean'));
+  }
+
+  assert.deepEqual(Object.keys(state.lightStates), madmapper.lights.map(({ name }) => name));
 });
 
 test('README documents the complete current deployment contract', () => {
@@ -84,6 +88,22 @@ test('README documents the complete current deployment contract', () => {
     '至少 9',
     '請依上方「目前部署設定」',
     '每個 `UnityModeController` 生命週期只顯示一次',
+    '投影方案',
+    '`profiles.config.json`',
+    '`agent/agent.config.json`',
+    '`ROOM_AGENT_TOKEN`',
+    '`RoomS1.exe`',
+    '`RoomS2.exe`',
+    '`build-info.json`',
+    '192.168.0.201',
+    '192.168.0.202',
+    '3100',
+    '?server=',
+    '`npm run agent:ping',
+    '`npm run fake-site`',
+    'schtasks',
+    '`-roomServerUrl`',
+    '`profiles.<id>.areas`',
   ]) {
     assert.ok(readme.includes(requiredText), `README must include ${requiredText}`);
   }

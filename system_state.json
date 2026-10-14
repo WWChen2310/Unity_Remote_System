@@ -1,25 +1,78 @@
 {
-  "contentMode": 8,
-  "maskMode": 1,
-  "surfaceStates": {
-    "Main": false,
-    "T1": false,
-    "T2": false,
-    "T3": false,
-    "T4": false,
-    "Ground": false
+  "version": 3,
+  "activeProfile": "s2",
+  "switch": {
+    "status": "idle",
+    "from": null,
+    "to": null,
+    "step": null,
+    "startedAt": null,
+    "error": null
   },
-  "tableModes": [
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0
-  ],
+  "profiles": {
+    "s1": {
+      "contentMode": 1,
+      "maskMode": 1,
+      "groundThemeId": "none",
+      "tableModes": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "surfaceStates": {
+        "Main-1": true,
+        "T1-1": true,
+        "T2-1": true,
+        "T3-1": true,
+        "T4-1": true,
+        "T5-1": true,
+        "T6-1": true,
+        "T7-1": true,
+        "Main-2": false,
+        "T2-2": false,
+        "T3-2": false,
+        "T4-2": false,
+        "T5-2": false,
+        "T6-2": false,
+        "T7-2": false
+      }
+    },
+    "s2": {
+      "contentMode": 8,
+      "maskMode": 1,
+      "groundThemeId": "none",
+      "tableModes": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "surfaceStates": {
+        "Main": false,
+        "T1": false,
+        "T2": false,
+        "T3": false,
+        "T4": false,
+        "Ground": false
+      }
+    }
+  },
+  "lightStates": {
+    "Light1": false,
+    "Light2": false,
+    "Light3": false
+  },
   "autoCycle": {
     "enabled": false,
     "interval": 1,

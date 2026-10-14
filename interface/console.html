@@ -231,6 +231,19 @@
         .table-btn:active {
             transform: translateY(1px);
         }
+        .area-group-title {
+            font-size: 0.8rem;
+            color: #6c757d;
+            margin: 4px 0 6px;
+        }
+        .area-group + .area-group {
+            margin-top: 12px;
+        }
+        #toast {
+            display: none;
+            z-index: 1050;
+            max-width: 90%;
+        }
     </style>
 </head>
 <body>
@@ -256,16 +269,53 @@
                         <small class="text-muted">內容模式</small>
                         <h6 class="mb-0 mt-1" id="currentContentMode">未知</h6>
                     </div>
-                    <!-- <div class="col-6">
-                        <small class="text-muted">桌面模式</small>
-                        <h6 class="mb-0 mt-1" id="currentMaskMode">未知</h6>
-                    </div> -->
+                    <div class="col-6">
+                        <small class="text-muted">投影方案</small>
+                        <h6 class="mb-0 mt-1" id="currentProfile">未知</h6>
+                    </div>
                 </div>
             </div>
         </div>
 
+        <!-- 投影方案：切換 Unity build、MadMapper surface 組與追蹤遮罩 -->
+        <div class="card" id="profileCard">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h6 class="card-subtitle text-muted mb-0">
+                        <i class="bi bi-collection"></i> 投影方案
+                    </h6>
+                    <span class="badge bg-secondary" id="agentBadge">代理離線</span>
+                </div>
+                <div class="row g-2" id="profileButtons">
+                    <!-- 由 JS 依方案目錄產生 -->
+                </div>
+                <div class="mt-3" id="profileProgress" style="display:none;">
+                    <div class="d-flex justify-content-between">
+                        <span id="profileStepText">切換中</span>
+                        <span class="text-muted" id="profileElapsed">0 秒</span>
+                    </div>
+                    <div class="progress mt-2" style="height: 6px;">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" id="profileProgressBar" style="width: 0%"></div>
+                    </div>
+                    <small class="text-muted d-block mt-2">切換期間全場黑畫面，其他控制暫停；工作燈仍可操作。</small>
+                </div>
+                <div class="alert alert-danger mt-3 mb-0" id="profileError" style="display:none;">
+                    <div id="profileErrorText"></div>
+                    <div class="d-flex gap-2 mt-2">
+                        <button class="btn btn-sm btn-danger" onclick="restartProfile()">重試</button>
+                        <button class="btn btn-sm btn-outline-danger" id="revertProfileButton" onclick="revertProfile()">回到原方案</button>
+                    </div>
+                </div>
+                <div class="alert alert-warning mt-3 mb-0" id="roomExitAlert" style="display:none;">
+                    <div id="roomExitText"></div>
+                    <button class="btn btn-sm btn-warning mt-2" onclick="restartProfile()">重新啟動目前方案</button>
+                </div>
+                <small class="text-muted d-block mt-2" id="roomsText"></small>
+            </div>
+        </div>
+
         <!-- 內容控制 -->
-        <div class="card">
+        <div class="card" data-lock-while-switching>
             <div class="card-body">
                 <h6 class="card-subtitle mb-3 text-muted">
                     <i class="bi bi-film"></i> 桌面背景
@@ -306,7 +356,7 @@
                     <div class="col-4">
                         <button class="btn btn-outline-secondary mode-btn w-100" onclick="switchContentMode(8)" id="content8" name="星空">
                             <i class="bi bi-6-circle"></i>
-                            <div>星空</div>
+                            <div id="content8Label">星空</div>
                         </button>
                     </div>
                     <div class="col-4">
@@ -319,8 +369,8 @@
             </div>
         </div>
 
-        <!-- 地面內容：與桌面背景互相獨立 -->
-        <div class="card">
+        <!-- 地面內容：與桌面背景互相獨立；投影方案沒有地面時整張隱藏 -->
+        <div class="card" id="groundCard" data-lock-while-switching>
             <div class="card-body">
                 <h6 class="card-subtitle mb-3 text-muted">
                     <i class="bi bi-square"></i> 地面內容
@@ -352,13 +402,13 @@
             </div>
         </div>
 
-        <div class="card">
+        <div class="card" id="seatCard" data-lock-while-switching>
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <h6 class="card-subtitle text-muted mb-0">
                         <i class="bi bi-layout-split"></i> 座位個別控制
                     </h6>
-                    <small class="text-danger" id="seatLockHint" style="display:none;">(稻田／水草背景下無座位效果)</small>
+                    <small class="text-danger" id="seatLockHint" style="display:none;"></small>
                 </div>
                 
                 <div id="tableControlPanel" class="table-control-grid">
@@ -366,7 +416,7 @@
             </div>
         </div>
 
-        <div class="card">
+        <div class="card" data-lock-while-switching>
             <div class="card-body">
                 <h6 class="card-subtitle mb-3 text-muted">
                     <i class="bi bi-tools"></i> 工作畫面
@@ -389,13 +439,13 @@
         </div>
 
         <!-- Area 控制 -->
-        <div class="card" id="areaControls">
+        <div class="card" id="areaControls" data-lock-while-switching>
             <div class="card-body">
                 <h6 class="card-subtitle mb-3 text-muted">
                     <i class="bi bi-grid"></i> 區域控制
                 </h6>
-                <div class="surface-grid" id="areaControlGrid">
-                    <!-- 由 JS 動態生成 -->
+                <div id="areaControlGroups">
+                    <!-- 由 JS 依目前投影方案產生 -->
                 </div>
                 <div class="mt-3">
                     <button class="btn btn-sm btn-outline-primary w-100" id="enableAllAreas" onclick="toggleAllSurfaces(true)">
@@ -423,7 +473,7 @@
         </div>
 
                 <!-- 自動循環控制 -->
-        <div class="card">
+        <div class="card" data-lock-while-switching>
             <div class="card-body">
                 <h6 class="card-subtitle mb-3 text-muted">
                     <i class="bi bi-arrow-repeat"></i> 自動循環切換
@@ -507,11 +557,14 @@
         </div>
     </div>
 
+    <div id="toast" class="alert alert-dark position-fixed bottom-0 start-50 translate-middle-x mb-3 py-2 px-3"></div>
+
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     <script src="control-settings.js"></script>
     <script>
         //#region settings
-        const serverUrl = '10.0.1.251';
+        // 現場伺服器是 192.168.0.201；辦公室或本機測試在網址加 ?server=10.0.1.251 或 ?server=127.0.0.1。
+        const serverUrl = new URLSearchParams(location.search).get('server') || '192.168.0.201';
         const wsUrl = `ws://${serverUrl}:3000`;
         
         let ws = null;
@@ -521,8 +574,39 @@
         
         // 自動循環相關變數
         let autoCycleEnabled = false;
-        // 稻田(4) 與水草(5) 不顯示座位雲層，席位控制在這兩個背景下無作用。
-        const SEAT_UNSUPPORTED_MODES = [4, 5];
+
+        // 投影方案。方案目錄（座位數、可用狀態、區域、有無地面）由伺服器提供。
+        let profileCatalog = [];
+        let activeProfileId = null;
+        let renderedProfileId = null;
+        let switchState = { status: 'idle' };
+        let switchSeenAt = null;
+        let switchTimer = null;
+        let agentConnected = false;
+        let lastExit = null;
+        let connectedRooms = [];
+
+        const SWITCH_STEP_LABELS = {
+            blackout: '熄燈中',
+            starting: '啟動 Unity',
+            waitingForRooms: '等待 Unity 連線',
+            settling: '等待畫面穩定',
+            restoring: '恢復投影'
+        };
+        const SWITCH_STEPS = Object.keys(SWITCH_STEP_LABELS);
+
+        const REJECT_REASONS = {
+            switching: '投影方案切換中，請稍候',
+            seatLocked: '目前背景下座位無法操作',
+            seatOutOfRange: '這個投影方案沒有這個座位狀態',
+            notInProfile: '這個區域不屬於目前的投影方案',
+            groundUnsupported: '這個投影方案沒有地面內容',
+            agentOffline: 'Unity 主機的代理程式離線，無法切換投影方案',
+            unknownProfile: '找不到這個投影方案',
+            invalidMode: '無效的背景',
+            invalidMask: '無效的遮罩',
+            invalidGroundTheme: '無效的地面內容'
+        };
 
         let cycleModes = [1, 2, 3, 4, 5]; // 預設循環模式
         let cycleInterval = 10; // 分鐘
@@ -542,13 +626,7 @@
             8: '星空'
         };
 
-        // Surface 設定（與伺服器保持一致）
-        const surfacesSettings = ControlSettings.AREA_NAMES.map(name => ({
-            SurfaceName: name,
-            ShowName: name
-        }));
-
-        // 工作燈：對伺服器來說跟投影區域是同一種東西（一個 OSC address 收 0/1），
+// 工作燈：對伺服器來說跟投影區域是同一種東西（一個 OSC address 收 0/1），
         // 所以共用 surfaceStates 與 madmapperControl，只有顯示分區不同。
         const lightsSettings = ControlSettings.LIGHT_NAMES.map(name => ({
             SurfaceName: name,
@@ -559,17 +637,56 @@
 
         //#region init & update methods
         
-        // 初始化 Surface 網格
-        function initSurfaceGrids() {
-            fillSurfaceGrid('areaControlGrid', surfacesSettings);
-            fillSurfaceGrid('lightControlGrid', lightsSettings);
+        // 工作燈只建一次；投影區域依目前方案重建。
+        function initLightGrid() {
+            fillSurfaceGrid(document.getElementById('lightControlGrid'), lightsSettings);
         }
 
-        function fillSurfaceGrid(gridId, settings) {
-            const grid = document.getElementById(gridId);
+        function fillSurfaceGrid(grid, settings) {
             settings.forEach(surface => {
                 grid.appendChild(createSurfaceToggle(surface));
-                surfaceStates[surface.SurfaceName] = false;
+                updateSurfaceUI(surface.SurfaceName, surfaceStates[surface.SurfaceName] === true);
+            });
+        }
+
+        function activeProfile() {
+            return profileCatalog.find(profile => profile.id === activeProfileId) || null;
+        }
+
+        function activeAreaNames() {
+            const profile = activeProfile();
+            return profile ? profile.areas.map(area => area.name) : [];
+        }
+
+        // s1 的區域分「模式一／模式二」兩組，沒有分組的方案全部放同一個格子。
+        function renderAreaGroups(profile) {
+            const container = document.getElementById('areaControlGroups');
+            container.innerHTML = '';
+            const groups = [];
+            profile.areas.forEach(area => {
+                const key = area.group || '';
+                let group = groups.find(g => g.key === key);
+                if (!group) {
+                    group = { key, areas: [] };
+                    groups.push(group);
+                }
+                group.areas.push(area);
+            });
+
+            groups.forEach(group => {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'area-group';
+                if (group.key) {
+                    const title = document.createElement('div');
+                    title.className = 'area-group-title';
+                    title.textContent = group.key;
+                    wrapper.appendChild(title);
+                }
+                const grid = document.createElement('div');
+                grid.className = 'surface-grid';
+                fillSurfaceGrid(grid, group.areas.map(area => ({ SurfaceName: area.name, ShowName: area.name })));
+                wrapper.appendChild(grid);
+                container.appendChild(wrapper);
             });
         }
 
@@ -588,17 +705,19 @@
             return div;
         }
 
-        function initTableControls() {
+        // 座位數與可用狀態依方案而定：s1 為 8 席、0–3（0 顯示「預設」），s2 為 9 席、0–4。
+        function initTableControls(profile) {
             const container = document.getElementById('tableControlPanel');
             container.innerHTML = '';
-            
-            ControlSettings.createSeatSettings().forEach(seat => {
+            const modes = ControlSettings.seatModesFor(profile.seatModes, profile.seatModeLabels);
+
+            ControlSettings.createSeatSettings(profile.seatCount).forEach(seat => {
                 const div = document.createElement('div');
                 div.className = 'table-control-item';
                 div.innerHTML = `
                     <label class="table-control-label">${seat.label}</label>
                     <div class="table-btn-group" id="table-group-${seat.index}">
-                        ${ControlSettings.SEAT_MODES.map(mode => `
+                        ${modes.map(mode => `
                         <button class="table-btn" onclick="updateTableMode(${seat.index}, ${mode.value})" data-val="${mode.value}">${mode.label}</button>`).join('')}
                     </div>
                 `;
@@ -606,14 +725,34 @@
             });
         }
 
+        // 依目前方案重建所有跟方案有關的卡片。
+        function renderProfileDependent() {
+            const profile = activeProfile();
+            if (!profile) return;
+            renderedProfileId = profile.id;
+
+            document.getElementById('currentProfile').textContent = profile.label;
+            document.getElementById('groundCard').style.display = profile.ground ? '' : 'none';
+
+            const label8 = (profile.modeLabels && profile.modeLabels['8']) || '星空';
+            document.getElementById('content8Label').textContent = label8;
+            document.getElementById('content8').name = label8;
+            modeNames[8] = label8;
+
+            initTableControls(profile);
+            renderAreaGroups(profile);
+            renderCycleModesList();
+            updateContentMode(currentContentMode);
+        }
+
         // 當使用者改變下拉選單時
         function updateTableMode(index, value) {
             if (!ws || ws.readyState !== WebSocket.OPEN) return;
             
-            // 9 席在每個桌面背景下都有效，不再只限原本的「分割內容」模式。
-            // 只有稻田／水草不顯示雲層、席位沒有視覺呈現，才擋下來——
-            // 判斷條件與面板上鎖用同一份清單，兩邊不會各自漂移。
-            if (SEAT_UNSUPPORTED_MODES.includes(currentContentMode)) return;
+            // 能不能操作由方案決定（s1 只在分割內容、s2 在稻田／水草以外），
+            // 與伺服器共用 isSeatPanelAvailable，兩邊不會各自漂移。
+            const profile = activeProfile();
+            if (!profile || !ControlSettings.isSeatPanelAvailable(profile, currentContentMode)) return;
 
             ws.send(JSON.stringify({
                 type: 'updateTableMode',
@@ -687,12 +826,15 @@
                 btn.className = (i === mode) ? 'btn btn-primary mode-btn w-100 active' : 'btn btn-outline-secondary mode-btn w-100';
             });
 
-            // 座位疊層在多數背景下都有效，但稻田與水草不顯示雲層，
-            // 席位在那兩個背景下沒有視覺呈現，所以面板鎖起來避免誤操作。
+            // 座位面板是否可用由方案決定：s1 只在分割內容，s2 在稻田、水草以外。
+            const profile = activeProfile();
             const panel = document.getElementById('tableControlPanel');
             const hint = document.getElementById('seatLockHint');
-            const seatsUnavailable = SEAT_UNSUPPORTED_MODES.includes(mode);
+            const seatsUnavailable = !profile || !ControlSettings.isSeatPanelAvailable(profile, mode);
             panel.classList.toggle('disabled-section', seatsUnavailable);
+            hint.textContent = profile && profile.seatOnlyInModes.length > 0
+                ? `(僅在${profile.seatOnlyInModes.map(m => modeNames[m] || m).join('、')}下可用)`
+                : '(稻田／水草背景下無座位效果)';
             hint.style.display = seatsUnavailable ? 'block' : 'none';
         }
 
@@ -778,6 +920,31 @@
 
         // 應用完整系統狀態(從伺服器載入)
         function applySystemState(state) {
+            // 投影方案目錄與目前方案（先套，其他卡片依它重建）
+            if (Array.isArray(state.profileCatalog)) {
+                profileCatalog = state.profileCatalog;
+            }
+            if (state.activeProfile) {
+                activeProfileId = state.activeProfile;
+            }
+            if (state.contentMode !== undefined) {
+                currentContentMode = state.contentMode;
+            }
+            if (state.surfaceStates) {
+                Object.assign(surfaceStates, state.surfaceStates);
+            }
+            if (activeProfileId !== renderedProfileId) {
+                renderProfileDependent();
+            }
+            if (state.agent) {
+                agentConnected = state.agent.connected === true;
+            }
+            if (Array.isArray(state.rooms)) {
+                connectedRooms = state.rooms;
+            }
+            lastExit = state.lastExit || null;
+            applySwitchState(state.switch);
+
             // 應用內容模式
             if (state.contentMode !== undefined) {
                 updateContentMode(state.contentMode);
@@ -820,12 +987,143 @@
             console.log(`- 內容模式: ${state.contentMode}`);
         }
 
-        // 批次切換所有 Surfaces
+        // 批次切換目前方案的所有投影區域（不含工作燈）
         function toggleAllSurfaces(enabled) {
-            surfacesSettings.forEach(surface => {
-                toggleSurface(surface.SurfaceName, enabled);
+            activeAreaNames().forEach(name => {
+                toggleSurface(name, enabled);
             });
         }
+
+        //#region projection profile
+
+        function renderProfileButtons() {
+            const container = document.getElementById('profileButtons');
+            container.innerHTML = '';
+            const switching = switchState.status === 'switching';
+            const columnClass = profileCatalog.length > 2 ? 'col-4' : 'col-6';
+
+            profileCatalog.forEach(profile => {
+                const column = document.createElement('div');
+                column.className = columnClass;
+                const button = document.createElement('button');
+                const isActive = profile.id === activeProfileId;
+                button.className = `btn mask-mode-btn w-100 ${isActive ? 'btn-primary active' : 'btn-outline-secondary'}`;
+                button.disabled = switching || !agentConnected;
+                button.innerHTML = `<div>${profile.label}</div><small>${profile.id}</small>`;
+                button.onclick = () => switchProfile(profile.id);
+                column.appendChild(button);
+                container.appendChild(column);
+            });
+
+            const badge = document.getElementById('agentBadge');
+            badge.className = `badge ${agentConnected ? 'bg-success' : 'bg-danger'}`;
+            badge.textContent = agentConnected ? '代理已連線' : '代理離線';
+        }
+
+        function applySwitchState(next) {
+            if (!next) return;
+            const wasSwitching = switchState.status === 'switching';
+            switchState = next;
+            const switching = next.status === 'switching';
+
+            if (switching && !wasSwitching) {
+                switchSeenAt = Date.now();
+                if (switchTimer) clearInterval(switchTimer);
+                switchTimer = setInterval(updateSwitchElapsed, 1000);
+            }
+            if (!switching && switchTimer) {
+                clearInterval(switchTimer);
+                switchTimer = null;
+            }
+
+            document.querySelectorAll('[data-lock-while-switching]').forEach(card => {
+                card.classList.toggle('disabled-section', switching);
+            });
+
+            document.getElementById('profileProgress').style.display = switching ? '' : 'none';
+            if (switching) {
+                const index = Math.max(0, SWITCH_STEPS.indexOf(next.step));
+                document.getElementById('profileStepText').textContent =
+                    `切換到 ${profileLabel(next.to)}：${SWITCH_STEP_LABELS[next.step] || '處理中'}`;
+                document.getElementById('profileProgressBar').style.width =
+                    `${Math.round(((index + 1) / SWITCH_STEPS.length) * 100)}%`;
+                updateSwitchElapsed();
+            }
+
+            const failed = next.status === 'failed';
+            document.getElementById('profileError').style.display = failed ? '' : 'none';
+            if (failed) {
+                document.getElementById('profileErrorText').textContent =
+                    `切換到 ${profileLabel(next.to)} 失敗（${SWITCH_STEP_LABELS[next.step] || next.step}）：${next.error || ''}`;
+                const revert = document.getElementById('revertProfileButton');
+                revert.style.display = next.from && next.from !== next.to ? '' : 'none';
+                revert.textContent = `回到 ${profileLabel(next.from)}`;
+            }
+
+            renderProfileButtons();
+            renderRoomStatus();
+        }
+
+        function updateSwitchElapsed() {
+            if (!switchSeenAt) return;
+            const seconds = Math.round((Date.now() - switchSeenAt) / 1000);
+            document.getElementById('profileElapsed').textContent = `${seconds} 秒`;
+        }
+
+        function renderRoomStatus() {
+            const text = connectedRooms.length > 0
+                ? `Unity：${connectedRooms.map(room => `${room.build}/${room.role}`).join('、')} 已連線`
+                : 'Unity：未連線';
+            document.getElementById('roomsText').textContent = text;
+
+            const alertBox = document.getElementById('roomExitAlert');
+            const show = Boolean(lastExit) && switchState.status === 'idle' && lastExit.profileId === activeProfileId;
+            alertBox.style.display = show ? '' : 'none';
+            if (show) {
+                document.getElementById('roomExitText').textContent =
+                    `Unity（${lastExit.name}）在 ${new Date(lastExit.at).toLocaleTimeString('zh-TW')} 非預期結束。`;
+            }
+        }
+
+        function profileLabel(profileId) {
+            const profile = profileCatalog.find(p => p.id === profileId);
+            return profile ? profile.label : (profileId || '');
+        }
+
+        function switchProfile(profileId) {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                alert('未連接到伺服器!');
+                return;
+            }
+            if (profileId === activeProfileId && switchState.status === 'idle') return;
+            const message = `切換到「${profileLabel(profileId)}」？\n\n約需 1–2 分鐘，期間全場黑畫面，其他控制暫停。`;
+            if (!confirm(message)) return;
+            ws.send(JSON.stringify({ type: 'switchProfile', profileId }));
+        }
+
+        function restartProfile() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                alert('未連接到伺服器!');
+                return;
+            }
+            if (!confirm(`重新啟動「${profileLabel(activeProfileId)}」？\n\n期間全場黑畫面。`)) return;
+            ws.send(JSON.stringify({ type: 'restartProfile' }));
+        }
+
+        function revertProfile() {
+            if (switchState.from) switchProfile(switchState.from);
+        }
+
+        let toastTimer = null;
+        function showToast(text) {
+            const toast = document.getElementById('toast');
+            toast.textContent = text;
+            toast.style.display = 'block';
+            if (toastTimer) clearTimeout(toastTimer);
+            toastTimer = setTimeout(() => { toast.style.display = 'none'; }, 3000);
+        }
+
+        //#endregion
 
         function updateLastUpdate() {
             const now = new Date();
@@ -892,6 +1190,30 @@
                 // 接收自動循環狀態更新
                 if (data.type === 'autoCycleUpdate') {
                     updateAutoCycleState(data);
+                }
+
+                // 投影方案切換進度
+                if (data.type === 'profileSwitchUpdate') {
+                    if (data.activeProfile && data.activeProfile !== activeProfileId) {
+                        activeProfileId = data.activeProfile;
+                        renderProfileDependent();
+                    }
+                    applySwitchState(data.switch);
+                }
+
+                if (data.type === 'agentStatusUpdate') {
+                    agentConnected = data.connected === true;
+                    renderProfileButtons();
+                }
+
+                if (data.type === 'roomStatusUpdate') {
+                    connectedRooms = data.rooms || [];
+                    lastExit = data.lastExit || null;
+                    renderRoomStatus();
+                }
+
+                if (data.type === 'commandRejected') {
+                    showToast(REJECT_REASONS[data.reason] || `指令被拒絕：${data.reason}`);
                 }
                 
                 updateLastUpdate();
@@ -1080,9 +1402,9 @@
 
         // 初始化
         document.getElementById('serverUrl').textContent = serverUrl;
-        initSurfaceGrids();
-        initTableControls();
+        initLightGrid();
         renderCycleModesList();
+        renderProfileButtons();
         connect();
     </script>
 </body>

@@ -5,7 +5,8 @@
 const { SEAT_MODES, isValidSeatMode } = require('./interface/control-settings');
 
 const SEAT_COUNT = 9;
-const REQUIRED_AREA_NAMES = ['Main', 'T1', 'T2', 'T3', 'T4', 'Ground'];
+// 方案 id 就是 Unity build 回報的 BuildId，也會出現在 MadMapper 設定與狀態檔的鍵裡。
+const PROFILE_ID_PATTERN = /^[a-z0-9_-]+$/;
 // 工作燈不像投影區域那樣綁死實體配置，數量與名稱可在 madmapper.config.json 調整；
 // 這裡只是介面預設顯示的三盞。
 const LIGHT_NAMES = ['Light1', 'Light2', 'Light3'];
@@ -36,13 +37,19 @@ function isValidTableIndex(value) {
   return Number.isInteger(value) && value >= 0 && value < SEAT_COUNT;
 }
 
+function isPlainObject(value) {
+  return value !== null
+    && typeof value === 'object'
+    && !Array.isArray(value)
+    && [Object.prototype, null].includes(Object.getPrototypeOf(value));
+}
+
+/**
+ * 每個投影方案各有一組 MadMapper 區域（s1 為 15 個 surface、s2 為六區），工作燈則是全域共用。
+ * 送 OSC 與保存開關時，每個方案用自己的 targetMap（該方案區域 + 全部工作燈）。
+ */
 function validateMadmapperConfig(config) {
-  if (
-    config === null
-    || typeof config !== 'object'
-    || Array.isArray(config)
-    || ![Object.prototype, null].includes(Object.getPrototypeOf(config))
-  ) {
+  if (!isPlainObject(config)) {
     throw new TypeError('MadMapper config must be a plain object');
   }
 
@@ -53,50 +60,11 @@ function validateMadmapperConfig(config) {
   validatePort(config.port, 'port');
   validatePort(config.localPort, 'localPort');
 
-  if (!Array.isArray(config.areas)) {
-    throw new TypeError('MadMapper areas must be an array');
-  }
-
-  const areaMap = {};
-  const areas = config.areas.map((area, index) => {
-    if (area === null || typeof area !== 'object' || Array.isArray(area)) {
-      throw new TypeError(`MadMapper area at index ${index} must be an object`);
-    }
-
-    const { name, oscAddress } = area;
-    if (typeof name !== 'string' || name === '') {
-      throw new TypeError(`MadMapper area at index ${index} must have a nonempty name`);
-    }
-    if (Object.prototype.hasOwnProperty.call(areaMap, name)) {
-      throw new Error(`MadMapper area name "${name}" is duplicated`);
-    }
-    if (!REQUIRED_AREA_NAMES.includes(name)) {
-      throw new Error(`MadMapper area name "${name}" is not a required area`);
-    }
-    if (
-      typeof oscAddress !== 'string'
-      || oscAddress === ''
-      || !oscAddress.startsWith('/')
-    ) {
-      throw new TypeError(
-        `MadMapper area "${name}" oscAddress must be nonempty and start with a slash (/)`,
-      );
-    }
-
-    const normalizedArea = { name, oscAddress };
-    areaMap[name] = normalizedArea;
-    return normalizedArea;
-  });
-
-  for (const requiredName of REQUIRED_AREA_NAMES) {
-    if (!Object.prototype.hasOwnProperty.call(areaMap, requiredName)) {
-      throw new Error(`MadMapper config is missing required area "${requiredName}"`);
-    }
-  }
-
-  if (areas.length !== REQUIRED_AREA_NAMES.length) {
+  // 舊格式的頂層 areas 不做靜默相容：那樣 s1 會少掉全部區域，現場只會看到「按了沒反應」。
+  if (Object.prototype.hasOwnProperty.call(config, 'areas') || !isPlainObject(config.profiles)) {
     throw new Error(
-      `MadMapper config must contain exactly ${REQUIRED_AREA_NAMES.length} required areas`,
+      'MadMapper config must list areas under profiles.<id>.areas; '
+      + 'migrate the old top-level areas list as described in the Readme',
     );
   }
 
@@ -106,29 +74,72 @@ function validateMadmapperConfig(config) {
     throw new TypeError('MadMapper lights must be an array');
   }
 
+  const usedNames = new Set();
   const lightMap = {};
   const lights = config.lights.map((light, index) => {
     const normalized = validateMadmapperTarget(light, index, 'light');
-    if (
-      Object.prototype.hasOwnProperty.call(lightMap, normalized.name)
-      || Object.prototype.hasOwnProperty.call(areaMap, normalized.name)
-    ) {
+    if (usedNames.has(normalized.name)) {
       throw new Error(`MadMapper light name "${normalized.name}" is duplicated`);
     }
+    usedNames.add(normalized.name);
     lightMap[normalized.name] = normalized;
     return normalized;
   });
+
+  const profiles = {};
+  for (const [profileId, profileConfig] of Object.entries(config.profiles)) {
+    if (!PROFILE_ID_PATTERN.test(profileId)) {
+      throw new Error(`MadMapper profile id "${profileId}" must match ${PROFILE_ID_PATTERN}`);
+    }
+    if (!isPlainObject(profileConfig) || !Array.isArray(profileConfig.areas)) {
+      throw new TypeError(`MadMapper profile "${profileId}" must have an areas array`);
+    }
+    if (profileConfig.areas.length === 0) {
+      throw new Error(`MadMapper profile "${profileId}" must have at least one area`);
+    }
+
+    const areaMap = {};
+    const areas = profileConfig.areas.map((area, index) => {
+      const { name, oscAddress } = validateMadmapperTarget(area, index, `area of profile "${profileId}"`);
+      if (usedNames.has(name)) {
+        throw new Error(`MadMapper area name "${name}" is duplicated`);
+      }
+      if (area.group !== undefined && area.group !== null && typeof area.group !== 'string') {
+        throw new TypeError(`MadMapper area "${name}" group must be a string`);
+      }
+      if (area.defaultOn !== undefined && typeof area.defaultOn !== 'boolean') {
+        throw new TypeError(`MadMapper area "${name}" defaultOn must be true or false`);
+      }
+
+      usedNames.add(name);
+      const normalizedArea = {
+        name,
+        oscAddress,
+        group: typeof area.group === 'string' ? area.group : null,
+        defaultOn: area.defaultOn === true,
+      };
+      areaMap[name] = normalizedArea;
+      return normalizedArea;
+    });
+
+    profiles[profileId] = {
+      areas,
+      areaMap,
+      targetMap: { ...areaMap, ...lightMap },
+    };
+  }
+
+  if (Object.keys(profiles).length === 0) {
+    throw new Error('MadMapper config must define at least one profile');
+  }
 
   return {
     ip: config.ip,
     port: config.port,
     localPort: config.localPort,
-    areas,
-    areaMap,
     lights,
     lightMap,
-    // 送 OSC 與保存開關狀態時用這張合併表，區域與工作燈一視同仁。
-    targetMap: { ...areaMap, ...lightMap },
+    profiles,
   };
 }
 
@@ -182,6 +193,7 @@ function createMadmapperOscMessage(areaMap, areaName, enabled) {
 
 module.exports = {
   SEAT_COUNT,
+  PROFILE_ID_PATTERN,
   SEAT_MODES,
   isValidSeatMode,
   LIGHT_NAMES,

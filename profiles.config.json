@@ -1,0 +1,42 @@
+{
+  "agent": {
+    "url": "ws://192.168.0.202:3100",
+    "token": "change-me",
+    "requestTimeoutSec": 60
+  },
+  "defaultProfile": "s2",
+  "profiles": {
+    "s1": {
+      "label": "2026-03 版",
+      "rooms": ["both"],
+      "seatCount": 8,
+      "seatOrder": "reversed",
+      "seatModes": [0, 1, 2, 3],
+      "seatModeLabels": { "0": "預設" },
+      "seatOnlyInModes": [8],
+      "seatLockedInModes": [],
+      "resetSeatsOnModes": [8],
+      "ground": false,
+      "modeLabels": { "8": "分割內容" },
+      "defaultMaskId": 1,
+      "readyTimeoutSec": 90,
+      "settleSec": 3
+    },
+    "s2": {
+      "label": "2026-07 版",
+      "rooms": ["tables", "ground"],
+      "seatCount": 9,
+      "seatOrder": "direct",
+      "seatModes": [0, 1, 2, 3, 4],
+      "seatModeLabels": {},
+      "seatOnlyInModes": [],
+      "seatLockedInModes": [4, 5],
+      "resetSeatsOnModes": [],
+      "ground": true,
+      "modeLabels": { "8": "星空" },
+      "defaultMaskId": 1,
+      "readyTimeoutSec": 120,
+      "settleSec": 3
+    }
+  }
+}
