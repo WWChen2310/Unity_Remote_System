@@ -23,6 +23,14 @@ const {
   viewKindForClient,
   classifyClient,
 } = require('./profile-model');
+const {
+  LOGO_FORMATS,
+  applyLogoControl,
+  parseLogoUpload,
+  logoImageId,
+  logoFileName,
+  createLogoImageMessage,
+} = require('./logo-model');
 const { RoomPresence } = require('./room-presence');
 const { ProfileSwitcher } = require('./profile-switcher');
 
@@ -59,6 +67,26 @@ function readStateFile(stateFile, log) {
   }
 }
 
+function loadLogoImage(directory, logo, log) {
+  if (!logo.imageId) return null;
+  const file = path.join(directory, logoFileName(logo.mime));
+  try {
+    const buffer = fs.readFileSync(file);
+    if (logoImageId(buffer) === logo.imageId) return buffer;
+    log(`Logo file ${file} does not match the saved state; the logo is cleared`);
+  } catch (error) {
+    log(`Unable to load logo: ${error.message}`);
+  }
+  return null;
+}
+
+function removeOtherLogoFiles(directory, keepFileName) {
+  for (const mime of Object.keys(LOGO_FORMATS)) {
+    const fileName = logoFileName(mime);
+    if (fileName !== keepFileName) fs.rmSync(path.join(directory, fileName), { force: true });
+  }
+}
+
 function startServer({
   wsPort = 3000,
   host,
@@ -86,6 +114,13 @@ function startServer({
     } catch (error) {
       log(`Unable to save system state: ${error.message}`);
     }
+  }
+
+  // Logo 圖檔放在狀態檔旁邊；狀態檔只記 imageId，啟動時核對兩者一致。
+  const logoDir = path.dirname(stateFile);
+  let logoImage = loadLogoImage(logoDir, state.logo, log);
+  if (!logoImage && state.logo.imageId) {
+    state.logo = { ...state.logo, enabled: false, imageId: null, mime: null };
   }
 
   // 啟動時就寫一次：舊格式立刻變成 v3，切換途中重啟的 failed 也會落地。
@@ -141,6 +176,14 @@ function startServer({
 
   function publishRoomStatus() {
     publishToConsoles({ type: 'roomStatusUpdate', rooms: presence.list(), lastExit });
+  }
+
+  function publishLogo() {
+    publish(() => ({ type: 'logoUpdate', logo: { ...state.logo } }));
+  }
+
+  function sendLogoImage(ws) {
+    if (logoImage) send(ws, createLogoImageMessage(state.logo, logoImage));
   }
 
   function reject(ws, command, reason, detail) {
@@ -292,6 +335,9 @@ function startServer({
       ws.clientInfo.role = data.role;
       presence.register(ws, { build: data.build, role: data.role });
       log(`room ${data.build}/${data.role} connected (${ws.clientInfo.id})`);
+      // Logo 不分方案：切換途中剛啟動、還不是目前方案的 build 也先拿到圖，恢復投影時就已經在畫面上。
+      sendLogoImage(ws);
+      send(ws, { type: 'logoUpdate', logo: { ...state.logo } });
       if (data.build === state.activeProfile) {
         send(ws, fullStateMessage('room'));
       } else {
@@ -405,6 +451,57 @@ function startServer({
       switcher.restartActive().then((result) => {
         if (!result.ok && result.reason !== 'failed') reject(ws, 'restartProfile', result.reason);
       });
+    },
+
+    uploadLogo(ws, data) {
+      const upload = parseLogoUpload(data.dataUrl);
+      if (upload.error) {
+        reject(ws, 'uploadLogo', upload.error);
+        return;
+      }
+      const fileName = logoFileName(upload.mime);
+      try {
+        fs.writeFileSync(path.join(logoDir, fileName), upload.buffer);
+        removeOtherLogoFiles(logoDir, fileName);
+      } catch (error) {
+        log(`Unable to save logo: ${error.message}`);
+        reject(ws, 'uploadLogo', 'logoSaveFailed');
+        return;
+      }
+      logoImage = upload.buffer;
+      state.logo = { ...state.logo, imageId: upload.imageId, mime: upload.mime };
+      saveState();
+      log(`Logo uploaded (${upload.mime}, ${upload.buffer.length} bytes, ${upload.imageId})`);
+      // 圖只送給需要畫它的 Unity 與控制台，追蹤端用不到。
+      const imageMessage = createLogoImageMessage(state.logo, logoImage);
+      for (const client of wss.clients) {
+        if (['room', 'web'].includes(client.clientInfo.kind)) send(client, imageMessage);
+      }
+      publishLogo();
+    },
+
+    logoControl(ws, data) {
+      const result = applyLogoControl(state.logo, data);
+      if (result.error) {
+        reject(ws, 'logoControl', result.error);
+        return;
+      }
+      state.logo = result.logo;
+      saveState();
+      publishLogo();
+    },
+
+    removeLogo() {
+      removeOtherLogoFiles(logoDir, null);
+      logoImage = null;
+      state.logo = { ...state.logo, enabled: false, imageId: null, mime: null };
+      saveState();
+      log('Logo removed');
+      publishLogo();
+    },
+
+    requestLogoImage(ws) {
+      sendLogoImage(ws);
     },
 
     autoCycleControl() {

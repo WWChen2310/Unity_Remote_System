@@ -9,6 +9,7 @@ const {
   normalizeGroundThemeId,
 } = require('./control-model');
 const { isValidSeatMode } = require('./interface/control-settings');
+const { normalizeLogoSettings } = require('./logo-model');
 
 const ROOM_ROLES = Object.freeze(['both', 'tables', 'ground']);
 const SEAT_ORDERS = Object.freeze(['direct', 'reversed']);
@@ -336,6 +337,8 @@ function migrateSystemState(raw, { profiles, madmapper }) {
     ])),
     lightStates: Object.fromEntries(madmapper.lights.map(({ name }) => [name, lights[name] === true])),
     autoCycle: normalizeAutoCycle(source.autoCycle),
+    // Logo 不屬於任何方案，切換方案也不會改變它。
+    logo: normalizeLogoSettings(source.logo),
   };
 }
 
@@ -393,6 +396,7 @@ function createConsoleState(state, { profiles, madmapper, agentConnected = false
     tableModes: [...active.tableModes],
     surfaceStates: { ...active.surfaceStates, ...state.lightStates },
     autoCycle: { ...state.autoCycle, modes: [...(state.autoCycle.modes || [])] },
+    logo: { ...state.logo },
     profileCatalog: createProfileCatalog(profiles, madmapper),
   };
 }
@@ -404,6 +408,8 @@ function createRoomState(state, profile) {
     contentMode: profileState.contentMode,
     maskMode: profileState.maskMode,
     tableModes: toUnityTableModes(profile, profileState.tableModes),
+    // 圖本身另外用 logoImage 送，這裡只有設定與 imageId。
+    logo: { ...state.logo },
   };
   if (profile.ground) {
     room.groundThemeId = profileState.groundThemeId;

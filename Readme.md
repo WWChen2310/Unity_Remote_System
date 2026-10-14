@@ -94,6 +94,14 @@ Node 連上 agent 後會自動確保目前方案在跑；現場重開機後只�
 - `npm run fake-site`：不接 Unity、MadMapper 與 agent，用假的 Unity 跑完整切換流程。再以靜態網站伺服器開 `interface/`，瀏覽器開 `console.html?server=127.0.0.1`。
 - 整機演練時，可用 `ROOM_CONFIG_DIR` 指定另一份 Node 設定檔目錄、`ROOM_AGENT_CONFIG` 指定另一份 agent 設定檔，不必改動 repo 裡的檔案。
 
+## Logo 疊圖
+
+- 控制台的「Logo 疊圖」卡片：上傳 PNG／JPEG（透明背景用 PNG，上限 4 MB；超過 2048 px 的圖瀏覽器會先縮小）、開關、大小、角度、水平／垂直位置。
+- Logo 疊在桌面輸出最上層（s2 的 `Room_Tables`、s1 的 `Spout Sender`），地面不疊。s1、s2 共用同一張圖與同一組設定，切換方案不會改變；切換途中也可以操作。
+- 圖存在 `system_state.json` 旁邊的 `room-logo.png` 或 `room-logo.jpg`（已加入 `.gitignore`），狀態檔只記 `logo.imageId`。搬機器時兩個檔案要一起帶走；只有狀態檔沒有圖時，Node 啟動會把 Logo 清掉並關閉。
+- 協定：控制台送 `uploadLogo`、`logoControl`、`removeLogo`、`requestLogoImage`；Node 廣播 `logoUpdate`（設定）與 `logoImage`（圖，base64），`systemStateUpdate.state.logo` 也帶設定。細節見 `logo-model.js`。
+- Unity 端需要含 `RoomLogoOverlay` 的 build（main 與 release/s1 都要重新建置）；舊 build 收到這些訊息會直接忽略。
+
 ---
 
 # Unity 遠端控制系統 - 部署指南

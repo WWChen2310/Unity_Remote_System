@@ -121,7 +121,57 @@
         .section-hidden {
             display: none;
         }
-        
+
+        /* Logo 疊圖：預覽框比例與桌面輸出（3480×1920）相同 */
+        .logo-preview {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 3480 / 1920;
+            background: #212529;
+            border-radius: 8px;
+            overflow: hidden;
+            margin-bottom: 12px;
+        }
+        .logo-preview img {
+            position: absolute;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+        }
+        .logo-preview.logo-off img {
+            opacity: 0.35;
+        }
+        .logo-preview .logo-empty {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #adb5bd;
+            font-size: 0.9rem;
+        }
+        .logo-slider-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 6px;
+        }
+        .logo-slider-row label {
+            min-width: 64px;
+            margin: 0;
+            font-size: 0.9rem;
+            color: #495057;
+        }
+        .logo-slider-row input[type=range] {
+            flex: 1;
+        }
+        .logo-slider-row .logo-value {
+            min-width: 52px;
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+            font-size: 0.85rem;
+            color: #6c757d;
+        }
+
         /* 自動循環相關樣式 */
         .auto-cycle-status {
             display: flex;
@@ -438,6 +488,71 @@
             </div>
         </div>
 
+        <!-- Logo 疊圖：s1、s2 共用，切換方案時也能操作 -->
+        <div class="card" id="logoCard">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h6 class="card-subtitle text-muted mb-0">
+                        <i class="bi bi-image"></i> Logo 疊圖
+                    </h6>
+                    <div class="form-check form-switch mb-0">
+                        <input class="form-check-input" type="checkbox" role="switch" id="logoEnabled"
+                               onchange="setLogoEnabled(this.checked)">
+                        <label class="form-check-label" for="logoEnabled" id="logoEnabledLabel">關閉</label>
+                    </div>
+                </div>
+
+                <div class="logo-preview logo-off" id="logoPreview">
+                    <img id="logoPreviewImage" alt="" style="display:none;">
+                    <div class="logo-empty" id="logoPreviewEmpty">尚未上傳 Logo</div>
+                </div>
+
+                <div class="logo-slider-row">
+                    <label for="logoScale">大小</label>
+                    <input type="range" class="form-range" id="logoScale" min="2" max="100" step="1" value="20"
+                           oninput="onLogoSlider('scale', this.value / 100)">
+                    <span class="logo-value" id="logoScaleValue">20%</span>
+                </div>
+                <div class="logo-slider-row">
+                    <label for="logoRotation">角度</label>
+                    <input type="range" class="form-range" id="logoRotation" min="-180" max="180" step="1" value="0"
+                           oninput="onLogoSlider('rotation', Number(this.value))">
+                    <span class="logo-value" id="logoRotationValue">0°</span>
+                </div>
+                <div class="logo-slider-row">
+                    <label for="logoX">水平位置</label>
+                    <input type="range" class="form-range" id="logoX" min="0" max="100" step="1" value="50"
+                           oninput="onLogoSlider('x', this.value / 100)">
+                    <span class="logo-value" id="logoXValue">50%</span>
+                </div>
+                <div class="logo-slider-row">
+                    <label for="logoY">垂直位置</label>
+                    <input type="range" class="form-range" id="logoY" min="0" max="100" step="1" value="50"
+                           oninput="onLogoSlider('y', this.value / 100)">
+                    <span class="logo-value" id="logoYValue">50%</span>
+                </div>
+                <div class="d-flex gap-2 mt-2">
+                    <button class="btn btn-sm btn-outline-secondary flex-fill" onclick="resetLogoTransform()">
+                        <i class="bi bi-arrow-counterclockwise"></i> 置中、角度歸零
+                    </button>
+                </div>
+
+                <input type="file" id="logoFile" accept="image/png,image/jpeg" class="d-none"
+                       onchange="uploadLogoFile(this.files[0]); this.value = '';">
+                <div class="d-flex gap-2 mt-2">
+                    <button class="btn btn-sm btn-primary flex-fill" onclick="document.getElementById('logoFile').click()">
+                        <i class="bi bi-upload"></i> <span id="logoUploadText">上傳 Logo</span>
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger" id="logoRemove" onclick="removeLogo()" disabled>
+                        <i class="bi bi-trash"></i> 移除
+                    </button>
+                </div>
+                <small class="text-muted d-block mt-2">
+                    <i class="bi bi-info-circle"></i> PNG 或 JPEG（透明背景請用 PNG），疊在桌面畫面最上層；s1、s2 共用同一張
+                </small>
+            </div>
+        </div>
+
         <!-- Area 控制 -->
         <div class="card" id="areaControls" data-lock-while-switching>
             <div class="card-body">
@@ -605,7 +720,13 @@
             unknownProfile: '找不到這個投影方案',
             invalidMode: '無效的背景',
             invalidMask: '無效的遮罩',
-            invalidGroundTheme: '無效的地面內容'
+            invalidGroundTheme: '無效的地面內容',
+            noLogoImage: '請先上傳 Logo',
+            invalidLogoSettings: '無效的 Logo 設定',
+            unsupportedLogoFormat: 'Logo 只支援 PNG 或 JPEG',
+            invalidLogoImage: '無法讀取這個圖檔',
+            logoTooLarge: 'Logo 檔案太大（上限 4 MB）',
+            logoSaveFailed: '伺服器無法儲存 Logo'
         };
 
         let cycleModes = [1, 2, 3, 4, 5]; // 預設循環模式
@@ -978,6 +1099,10 @@
                 }
             }
 
+            if (state.logo) {
+                applyLogoSettings(state.logo);
+            }
+
             // 應用桌子狀態
             if (state.tableModes) {
                 updateTableUI(state.tableModes);
@@ -1146,6 +1271,8 @@
                 ws.send(JSON.stringify({
                     clientType: 'web'
                 }));
+                // 圖不在 systemStateUpdate 裡（太大），連上後另外要一次。
+                ws.send(JSON.stringify({ type: 'requestLogoImage' }));
             };
 
             ws.onmessage = (event) => {
@@ -1212,7 +1339,19 @@
                     renderRoomStatus();
                 }
 
+                if (data.type === 'logoUpdate') {
+                    applyLogoSettings(data.logo);
+                }
+
+                if (data.type === 'logoImage') {
+                    applyLogoImage(data);
+                }
+
                 if (data.type === 'commandRejected') {
+                    if (data.command === 'uploadLogo') {
+                        logoUploading = false;
+                        renderLogo();
+                    }
                     showToast(REJECT_REASONS[data.reason] || `指令被拒絕：${data.reason}`);
                 }
                 
@@ -1230,6 +1369,167 @@
             };
         }
         
+        //#region logo
+
+        // 伺服器上的 Logo 設定；圖另外以 logoImage 送來，用 imageId 對應。
+        let logoSettings = { enabled: false, scale: 0.2, rotation: 0, x: 0.5, y: 0.5, imageId: null };
+        let logoImageId = null;
+        let logoUploading = false;
+        // 拖曳滑桿時節流送出；節流期間最後一個值一定會送到。
+        const LOGO_SEND_INTERVAL_MS = 60;
+        let logoPending = {};
+        let logoSendTimer = null;
+        // 太大的圖先在瀏覽器縮小：投影用不到這麼高的解析度，也避免超過伺服器的 4 MB 上限。
+        const LOGO_MAX_EDGE = 2048;
+        const LOGO_MAX_BYTES = 4 * 1024 * 1024;
+
+        function sendLogo(message) {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                showToast('未連接到伺服器');
+                return false;
+            }
+            ws.send(JSON.stringify(message));
+            return true;
+        }
+
+        function setLogoEnabled(enabled) {
+            if (enabled && !logoSettings.imageId) {
+                showToast(REJECT_REASONS.noLogoImage);
+                renderLogo();
+                return;
+            }
+            sendLogo({ type: 'logoControl', enabled });
+        }
+
+        function onLogoSlider(field, value) {
+            logoSettings[field] = value;
+            logoPending[field] = value;
+            renderLogo();
+            if (!logoSendTimer) {
+                flushLogoPending();
+                logoSendTimer = setTimeout(() => {
+                    logoSendTimer = null;
+                    flushLogoPending();
+                }, LOGO_SEND_INTERVAL_MS);
+            }
+        }
+
+        function flushLogoPending() {
+            if (Object.keys(logoPending).length === 0) return;
+            sendLogo({ type: 'logoControl', ...logoPending });
+            logoPending = {};
+        }
+
+        function resetLogoTransform() {
+            sendLogo({ type: 'logoControl', rotation: 0, x: 0.5, y: 0.5 });
+        }
+
+        function removeLogo() {
+            if (!logoSettings.imageId) return;
+            if (!confirm('確定要移除 Logo？')) return;
+            sendLogo({ type: 'removeLogo' });
+        }
+
+        function uploadLogoFile(file) {
+            if (!file) return;
+            if (!['image/png', 'image/jpeg'].includes(file.type)) {
+                showToast(REJECT_REASONS.unsupportedLogoFormat);
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = () => {
+                const image = new Image();
+                image.onload = () => {
+                    const longEdge = Math.max(image.naturalWidth, image.naturalHeight);
+                    if (longEdge <= LOGO_MAX_EDGE && file.size <= LOGO_MAX_BYTES) {
+                        submitLogo(reader.result);
+                        return;
+                    }
+                    const ratio = Math.min(1, LOGO_MAX_EDGE / longEdge);
+                    const canvas = document.createElement('canvas');
+                    canvas.width = Math.round(image.naturalWidth * ratio);
+                    canvas.height = Math.round(image.naturalHeight * ratio);
+                    canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height);
+                    // PNG 保留透明；JPEG 本來就沒有透明，維持 JPEG 比較小。
+                    submitLogo(canvas.toDataURL(file.type, 0.92));
+                };
+                image.onerror = () => showToast(REJECT_REASONS.invalidLogoImage);
+                image.src = reader.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function submitLogo(dataUrl) {
+            if (sendLogo({ type: 'uploadLogo', dataUrl })) {
+                logoUploading = true;
+                renderLogo();
+            }
+        }
+
+        function applyLogoSettings(logo) {
+            if (!logo) return;
+            // 自己還沒送出的滑桿值優先，避免伺服器回來的舊值把滑桿拉回去。
+            logoSettings = { ...logoSettings, ...logo, ...logoPending };
+            if (logoSettings.imageId && logoSettings.imageId !== logoImageId) {
+                sendLogo({ type: 'requestLogoImage' });
+            }
+            renderLogo();
+        }
+
+        function applyLogoImage(message) {
+            logoImageId = message.imageId;
+            logoUploading = false;
+            const image = document.getElementById('logoPreviewImage');
+            image.onload = renderLogo;
+            image.src = `data:${message.mime};base64,${message.data}`;
+            renderLogo();
+        }
+
+        function renderLogo() {
+            const hasImage = Boolean(logoSettings.imageId);
+            const enabled = hasImage && logoSettings.enabled;
+            const toggle = document.getElementById('logoEnabled');
+            toggle.checked = enabled;
+            toggle.disabled = !hasImage;
+            document.getElementById('logoEnabledLabel').textContent = enabled ? '開啟' : '關閉';
+            document.getElementById('logoRemove').disabled = !hasImage;
+            document.getElementById('logoUploadText').textContent =
+                logoUploading ? '上傳中…' : (hasImage ? '更換 Logo' : '上傳 Logo');
+
+            const percent = v => Math.round(v * 100);
+            const sliders = {
+                scale: { id: 'logoScale', toInput: percent, text: v => `${percent(v)}%` },
+                rotation: { id: 'logoRotation', toInput: Math.round, text: v => `${Math.round(v)}°` },
+                x: { id: 'logoX', toInput: percent, text: v => `${percent(v)}%` },
+                y: { id: 'logoY', toInput: percent, text: v => `${percent(v)}%` }
+            };
+            Object.entries(sliders).forEach(([field, slider]) => {
+                const input = document.getElementById(slider.id);
+                if (document.activeElement !== input) input.value = slider.toInput(logoSettings[field]);
+                document.getElementById(`${slider.id}Value`).textContent = slider.text(logoSettings[field]);
+            });
+
+            // 預覽與 Unity 同一套定義：scale 是 Logo 高度佔畫面高度的比例，中心在 (x, y)，順時針旋轉。
+            const preview = document.getElementById('logoPreview');
+            const image = document.getElementById('logoPreviewImage');
+            const showImage = hasImage && logoImageId === logoSettings.imageId && image.naturalHeight > 0;
+            preview.classList.toggle('logo-off', !enabled);
+            document.getElementById('logoPreviewEmpty').style.display = showImage ? 'none' : '';
+            image.style.display = showImage ? '' : 'none';
+            if (showImage) {
+                const height = preview.clientHeight * logoSettings.scale;
+                image.style.height = `${height}px`;
+                image.style.width = `${height * image.naturalWidth / image.naturalHeight}px`;
+                image.style.left = `${logoSettings.x * 100}%`;
+                image.style.top = `${logoSettings.y * 100}%`;
+                image.style.transform = `translate(-50%, -50%) rotate(${logoSettings.rotation}deg)`;
+            }
+        }
+
+        window.addEventListener('resize', renderLogo);
+
+        //#endregion
+
         //#region auto cycle
 
         // 啟用/停用自動循環

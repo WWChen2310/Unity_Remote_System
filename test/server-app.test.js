@@ -54,11 +54,14 @@ function connectClient(t, url, hello) {
   };
 }
 
-async function startTestSite(t, { initialState, hangActivate = false } = {}) {
+async function startTestSite(t, { initialState, files = {}, hangActivate = false } = {}) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'room-server-'));
   const stateFile = path.join(directory, 'system_state.json');
   if (initialState) {
     fs.writeFileSync(stateFile, JSON.stringify(initialState));
+  }
+  for (const [name, content] of Object.entries(files)) {
+    fs.writeFileSync(path.join(directory, name), content);
   }
 
   const oscLog = [];
@@ -130,7 +133,7 @@ test('the agent connecting starts the active profile and its rooms get room view
   const roomState = await tables.waitFor((m) => m.type === 'systemStateUpdate' && !('activeProfile' in m.state));
   assert.equal(roomState.state.groundThemeId, 'none');
   assert.equal(roomState.state.tableModes.length, 9);
-  assert.deepEqual(Object.keys(roomState.state).sort(), ['contentMode', 'groundThemeId', 'maskMode', 'tableModes']);
+  assert.deepEqual(Object.keys(roomState.state).sort(), ['contentMode', 'groundThemeId', 'logo', 'maskMode', 'tableModes']);
 });
 
 test('switching to s1 gives the s1 room eight reversed seats and restores s1 areas', async (t) => {
@@ -368,4 +371,88 @@ test('a legacy state file is migrated and saved as v3 on start', async (t) => {
   assert.equal(saved.profiles.s2.contentMode, 5);
   assert.deepEqual(saved.profiles.s2.tableModes, [1, 0, 0, 0, 0, 0, 0, 0, 0]);
   assert.ok(saved.timestamp);
+});
+
+// ---- logo -------------------------------------------------------------------
+
+const PNG_BYTES = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3, 4]);
+const PNG_DATA_URL = `data:image/png;base64,${PNG_BYTES.toString('base64')}`;
+
+test('an uploaded logo reaches the rooms and consoles, and its settings follow', async (t) => {
+  const site = await startAndSettle(t);
+  const consoleClient = await site.connectConsole();
+  const tables = site.agent.rooms('s2').find(({ role }) => role === 'tables');
+
+  consoleClient.send({ type: 'logoControl', enabled: true });
+  assert.equal((await consoleClient.waitFor((m) => m.type === 'commandRejected')).reason, 'noLogoImage');
+
+  consoleClient.send({ type: 'uploadLogo', dataUrl: PNG_DATA_URL });
+  const roomImage = await tables.waitFor((m) => m.type === 'logoImage');
+  assert.equal(roomImage.mime, 'image/png');
+  assert.deepEqual(Buffer.from(roomImage.data, 'base64'), PNG_BYTES);
+  const consoleImage = await consoleClient.waitFor((m) => m.type === 'logoImage');
+  assert.equal(consoleImage.imageId, roomImage.imageId);
+
+  consoleClient.send({ type: 'logoControl', enabled: true, scale: 5, rotation: 45 });
+  const update = await tables.waitFor((m) => m.type === 'logoUpdate' && m.logo.enabled);
+  assert.equal(update.logo.scale, 1, 'scale is clamped');
+  assert.equal(update.logo.rotation, 45);
+  assert.equal(update.logo.imageId, roomImage.imageId);
+  assert.ok(fs.existsSync(path.join(path.dirname(site.stateFile), 'room-logo.png')));
+});
+
+test('the logo is shared by both profiles and survives a switch', async (t) => {
+  const site = await startAndSettle(t);
+  const consoleClient = await site.connectConsole();
+  consoleClient.send({ type: 'uploadLogo', dataUrl: PNG_DATA_URL });
+  await consoleClient.waitFor((m) => m.type === 'logoImage');
+  consoleClient.send({ type: 'logoControl', enabled: true, rotation: -30 });
+  await consoleClient.waitFor((m) => m.type === 'logoUpdate' && m.logo.enabled);
+
+  consoleClient.send({ type: 'switchProfile', profileId: 's1' });
+  await consoleClient.waitFor(isIdleOn('s1'));
+
+  const s1Room = site.agent.rooms('s1')[0];
+  const image = await s1Room.waitFor((m) => m.type === 'logoImage');
+  assert.deepEqual(Buffer.from(image.data, 'base64'), PNG_BYTES);
+  const roomState = await s1Room.waitFor((m) => m.type === 'systemStateUpdate' && !('activeProfile' in m.state));
+  assert.equal(roomState.state.logo.enabled, true);
+  assert.equal(roomState.state.logo.rotation, -30);
+});
+
+test('the logo is restored from disk after the server restarts', async (t) => {
+  const first = await startTestSite(t);
+  const consoleClient = await first.connectConsole();
+  consoleClient.send({ type: 'uploadLogo', dataUrl: PNG_DATA_URL });
+  await consoleClient.waitFor((m) => m.type === 'logoImage');
+  consoleClient.send({ type: 'logoControl', enabled: true, x: 0.8 });
+  await consoleClient.waitFor((m) => m.type === 'logoUpdate' && m.logo.enabled);
+  const savedState = JSON.parse(fs.readFileSync(first.stateFile, 'utf8'));
+  const savedImage = fs.readFileSync(path.join(path.dirname(first.stateFile), 'room-logo.png'));
+
+  const restored = await startTestSite(t, { initialState: savedState, files: { 'room-logo.png': savedImage } });
+  assert.equal(restored.server.getState().logo.enabled, true);
+  assert.equal(restored.server.getState().logo.x, 0.8);
+  const room = connectClient(t, restored.url, { clientType: 'room', type: 'unitySync', build: 's2', role: 'tables' });
+  const image = await room.waitFor((m) => m.type === 'logoImage');
+  assert.deepEqual(Buffer.from(image.data, 'base64'), PNG_BYTES);
+
+  // 狀態檔有 imageId 但旁邊沒有圖：Logo 清掉並關閉，不留一個 Unity 拿不到圖的開啟狀態。
+  const missing = await startTestSite(t, { initialState: savedState });
+  assert.equal(missing.server.getState().logo.enabled, false);
+  assert.equal(missing.server.getState().logo.imageId, null);
+});
+
+test('removing the logo turns it off and deletes the file', async (t) => {
+  const site = await startTestSite(t);
+  const consoleClient = await site.connectConsole();
+  consoleClient.send({ type: 'uploadLogo', dataUrl: PNG_DATA_URL });
+  await consoleClient.waitFor((m) => m.type === 'logoImage');
+  consoleClient.send({ type: 'logoControl', enabled: true });
+  await consoleClient.waitFor((m) => m.type === 'logoUpdate' && m.logo.enabled);
+
+  consoleClient.send({ type: 'removeLogo' });
+  const update = await consoleClient.waitFor((m) => m.type === 'logoUpdate' && m.logo.imageId === null);
+  assert.equal(update.logo.enabled, false);
+  assert.equal(fs.existsSync(path.join(path.dirname(site.stateFile), 'room-logo.png')), false);
 });
