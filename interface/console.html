@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>LE ROOM 控制台</title>
     <link rel="icon" href="assets/Room_logo.ico" type="image/x-icon">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -294,25 +294,93 @@
             z-index: 1050;
             max-width: 90%;
         }
+        /* Tablet workspace: compact persistent context, one focused panel at a time. */
+        :root { --ink:#243238; --accent:#205f68; --line:#dce4e5; }
+        body { background:#eef2f2; color:var(--ink); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; padding:max(16px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left)); }
+        .container { max-width:1080px; display:flex; flex-direction:column; gap:16px; padding:0; }
+        .card { margin:0; min-width:0; border:1px solid var(--line); border-radius:16px; box-shadow:0 3px 14px #24323805; }
+        .card-body { padding:22px; }
+        .card-subtitle { font-weight:650; letter-spacing:.02em; color:var(--ink) !important; }
+        .card-subtitle > i { margin-right:6px; color:var(--accent); }
+        .console-header { background:transparent; border:0; box-shadow:none; }
+        .console-header > .card-body { padding:0 4px; display:flex; align-items:center; justify-content:space-between; gap:20px; text-align:left !important; }
+        .console-header h3 { margin:0 !important; line-height:0; }
+        .logo-room { width:68px; height:68px; }
+        .header-status { display:flex; align-items:center; gap:24px; }
+        .status-overview { border:0; box-shadow:none; background:transparent; }
+        .status-overview .card-body { padding:0; }
+        .status-overview .row { gap:24px; margin:0; }
+        .status-overview .col-6 { width:auto; padding:0; }
+        .status-overview small { font-size:11px; letter-spacing:.08em; }
+        .status-overview h6 { font-size:14px; }
+        .status-badge { padding:10px 12px; border-radius:20px; white-space:nowrap; }
+        #profileCard .card-body { padding:16px 20px; }
+        #profileCard .card-body > .d-flex { margin-bottom:10px !important; }
+        #profileButtons button { height:auto; min-height:64px; text-align:left; padding:10px 16px; border-radius:10px; font-size:15px; }
+        #profileButtons small { display:block; font-size:12px; font-weight:400; margin-top:3px; opacity:.8; }
+        .profile-guide { margin-top:8px; font-size:12px; color:#68777d; }
+        .profile-guide summary { cursor:pointer; padding:8px 0; min-height:36px; }
+        .profile-guide strong { display:block; margin-top:6px; }
+        .profile-guide p { margin:4px 0 8px; line-height:1.7; }
+        #roomsText { font-size:11px; }
+        #roomsText:empty { display:none !important; }
+        #statusBadge:not(.bg-success):not(.bg-danger) { background:#64767b; }
+        .btn-primary { --bs-btn-bg:var(--accent); --bs-btn-border-color:var(--accent); --bs-btn-hover-bg:#174b53; --bs-btn-hover-border-color:#174b53; --bs-btn-active-bg:#174b53; --bs-btn-active-border-color:#174b53; }
+        .console-tabs { display:flex; gap:4px; background:#dde6e6; padding:5px; border-radius:13px; position:sticky; top:8px; z-index:20; }
+        .console-tabs button { flex:1; min-width:0; border:0; background:transparent; color:#53666b; border-radius:9px; min-height:50px; padding:10px 8px; font-size:14px; font-weight:600; display:flex; align-items:center; justify-content:center; gap:8px; }
+        .console-tabs button[aria-selected="true"] { background:white; color:var(--accent); box-shadow:0 2px 5px #24323812; }
+        .control-panel { display:flex; flex-direction:column; gap:16px; }
+        .control-panel[hidden] { display:none !important; }
+        .mode-btn { height:88px; border-width:1px; border-radius:12px; background:#f8fafa; color:#465b62; font-weight:600; }
+        .mode-btn i { font-size:1.6rem; margin-bottom:5px; }
+        #contentCard .col-4 { width:25%; }
+        #groundCard .mode-btn { height:64px; display:flex; align-items:center; justify-content:center; gap:10px; }
+        #groundCard .mode-btn i { font-size:1.25rem; margin:0; }
+        .mode-btn.active, .mode-btn.active:hover, .mask-mode-btn.active, .table-btn.active, .surface-toggle.active { background:var(--accent) !important; border-color:var(--accent) !important; color:white !important; box-shadow:none; }
+        .mode-btn:hover, .mask-mode-btn:hover, .surface-toggle:hover { transform:none; box-shadow:none; }
+        button, .surface-toggle { touch-action:manipulation; }
+        .btn, .table-btn, input[type=range] { min-height:44px; }
+        input[type=text], input[type=number], select { font-size:16px !important; }
+        button:focus-visible, summary:focus-visible { outline:3px solid #aa6d29; outline-offset:3px; }
+        .table-control-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+        .table-control-item { flex-direction:column; align-items:stretch; padding:14px; gap:8px; background:#f3f6f6; border-radius:12px; }
+        .table-control-label { font-size:13px; }
+        .table-btn-group { gap:5px; }
+        .table-btn { border-width:1px; font-size:13px; }
+        #seatCard .card-body > .d-flex { flex-wrap:wrap; gap:8px; }
+        #seatLockHint { line-height:1.6; }
+        .surface-grid { grid-template-columns:repeat(4,minmax(0,1fr)); }
+        .surface-toggle { color:#495057; font:inherit; border-width:1px; border-radius:10px; padding:12px 8px; }
+        .area-group-title { font-size:13px; font-weight:600; margin-bottom:10px; }
+        #lightControlGrid { grid-template-columns:repeat(3,minmax(0,1fr)); }
+        #panel-logo, #panel-settings { width:100%; max-width:820px; margin-inline:auto; }
+        @media (max-width:600px) {
+            body { padding:12px; }
+            .container, .control-panel { gap:12px; }
+            .card-body { padding:16px; }
+            .header-status { gap:10px; }
+            .status-overview .row { gap:12px; }
+            .status-overview h6 { font-size:12px; }
+            .logo-room { width:46px; height:46px; }
+            .status-badge { font-size:11px; padding:8px; }
+            .console-tabs button { flex-direction:column; gap:4px; padding:8px 2px; font-size:11px; }
+            .console-tabs button i { font-size:16px; }
+            #profileButtons button { padding:10px; font-size:13px; }
+            #contentCard .col-4 { width:33.3333%; }
+            .table-control-grid { grid-template-columns:minmax(0,1fr); }
+            .surface-grid { grid-template-columns:repeat(3,minmax(0,1fr)); }
+            #groundCard .mode-btn { flex-direction:column; gap:4px; height:76px; }
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <!-- 頁首 -->
-        <div class="card">
+<div class="card console-header">
             <div class="card-body text-center">
                 <h3 class="card-title mb-3">
                     <span class="logo-room"></span>
                 </h3>
-                <span class="badge status-badge" id="statusBadge">
-                    <i class="bi bi-circle-fill"></i>
-                    <span id="statusText">未連接</span>
-                </span>
-            </div>
-        </div>
-
-        <!-- 當前狀態 -->
-        <div class="card">
+<div class="header-status"><div class="card status-overview">
             <div class="card-body">
                 <div class="row">
                     <div class="col-6">
@@ -325,10 +393,13 @@
                     </div>
                 </div>
             </div>
+        </div><span class="badge status-badge" id="statusBadge">
+                    <i class="bi bi-circle-fill"></i>
+                    <span id="statusText">未連接</span>
+                </span></div>
+            </div>
         </div>
-
-        <!-- 投影方案：切換 Unity build、MadMapper surface 組與追蹤遮罩 -->
-        <div class="card" id="profileCard">
+<div class="card" id="profileCard">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <h6 class="card-subtitle text-muted mb-0">
@@ -339,7 +410,11 @@
                 <div class="row g-2" id="profileButtons">
                     <!-- 由 JS 依方案目錄產生 -->
                 </div>
-                <div class="mt-3" id="profileProgress" style="display:none;">
+                <details class="profile-guide"><summary>版本規則與共用設定</summary><div aria-live="polite">
+                    <strong id="profileGuideTitle">等待伺服器同步目前方案</strong>
+                    <p id="profileGuideText">連線後會顯示此版本的座位、地面與區域控制規則。</p>
+                </div>
+                </details><div class="mt-3" id="profileProgress" style="display:none;">
                     <div class="d-flex justify-content-between">
                         <span id="profileStepText">切換中</span>
                         <span class="text-muted" id="profileElapsed">0 秒</span>
@@ -347,7 +422,7 @@
                     <div class="progress mt-2" style="height: 6px;">
                         <div class="progress-bar progress-bar-striped progress-bar-animated" id="profileProgressBar" style="width: 0%"></div>
                     </div>
-                    <small class="text-muted d-block mt-2">切換期間全場黑畫面，其他控制暫停；工作燈仍可操作。</small>
+                    <small class="text-muted d-block mt-2">切換期間全場黑畫面，方案控制暫停；工作燈與 Logo 仍可操作。</small>
                 </div>
                 <div class="alert alert-danger mt-3 mb-0" id="profileError" style="display:none;">
                     <div id="profileErrorText"></div>
@@ -363,9 +438,8 @@
                 <small class="text-muted d-block mt-2" id="roomsText"></small>
             </div>
         </div>
-
-        <!-- 內容控制 -->
-        <div class="card" data-lock-while-switching>
+<nav class="console-tabs" role="tablist" aria-label="控制分類"><button type="button" role="tab" id="tab-content" aria-controls="panel-content" aria-selected="true" tabindex="0" data-tab="content"><i class="bi bi-play-circle" aria-hidden="true"></i><span>內容播放</span></button><button type="button" role="tab" id="tab-seats" aria-controls="panel-seats" aria-selected="false" tabindex="-1" data-tab="seats"><i class="bi bi-layout-split" aria-hidden="true"></i><span>座位控制</span></button><button type="button" role="tab" id="tab-projection" aria-controls="panel-projection" aria-selected="false" tabindex="-1" data-tab="projection"><i class="bi bi-grid" aria-hidden="true"></i><span>投影與燈光</span></button><button type="button" role="tab" id="tab-logo" aria-controls="panel-logo" aria-selected="false" tabindex="-1" data-tab="logo"><i class="bi bi-image" aria-hidden="true"></i><span>Logo 疊圖</span></button><button type="button" role="tab" id="tab-settings" aria-controls="panel-settings" aria-selected="false" tabindex="-1" data-tab="settings"><i class="bi bi-sliders" aria-hidden="true"></i><span>循環與資訊</span></button></nav>
+<section class="control-panel" id="panel-content" role="tabpanel" aria-labelledby="tab-content" tabindex="0"><div class="card" id="contentCard" data-lock-while-switching>
             <div class="card-body">
                 <h6 class="card-subtitle mb-3 text-muted">
                     <i class="bi bi-film"></i> 桌面背景
@@ -418,9 +492,7 @@
                 </div>
             </div>
         </div>
-
-        <!-- 地面內容：與桌面背景互相獨立；投影方案沒有地面時整張隱藏 -->
-        <div class="card" id="groundCard" data-lock-while-switching>
+<div class="card" id="groundCard" data-lock-while-switching>
             <div class="card-body">
                 <h6 class="card-subtitle mb-3 text-muted">
                     <i class="bi bi-square"></i> 地面內容
@@ -450,9 +522,8 @@
                     </div>
                 </div>
             </div>
-        </div>
-
-        <div class="card" id="seatCard" data-lock-while-switching>
+        </div></section>
+<section class="control-panel" id="panel-seats" role="tabpanel" aria-labelledby="tab-seats" tabindex="0" hidden><div class="card" id="seatCard" data-lock-while-switching>
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <h6 class="card-subtitle text-muted mb-0">
@@ -464,9 +535,38 @@
                 <div id="tableControlPanel" class="table-control-grid">
                     </div>
             </div>
+        </div></section>
+<section class="control-panel" id="panel-projection" role="tabpanel" aria-labelledby="tab-projection" tabindex="0" hidden><div class="card" id="areaControls" data-lock-while-switching>
+            <div class="card-body">
+                <h6 class="card-subtitle mb-3 text-muted">
+                    <i class="bi bi-grid"></i> 區域控制
+                </h6>
+                <div id="areaControlGroups">
+                    <!-- 由 JS 依目前投影方案產生 -->
+                </div>
+                <div class="mt-3">
+                    <button class="btn btn-sm btn-outline-primary w-100" id="enableAllAreas" onclick="toggleAllSurfaces(true)">
+                        <i class="bi bi-check-all"></i> 全部開啟
+                    </button>
+                </div>
+                <div class="mt-2">
+                    <button class="btn btn-sm btn-outline-secondary w-100" id="disableAllAreas" onclick="toggleAllSurfaces(false)">
+                        <i class="bi bi-x-circle"></i> 全部關閉
+                    </button>
+                </div>
+            </div>
         </div>
-
-        <div class="card" data-lock-while-switching>
+<div class="card" id="lightControls">
+            <div class="card-body">
+                <h6 class="card-subtitle mb-3 text-muted">
+                    <i class="bi bi-lightbulb"></i> 工作燈開關
+                </h6>
+                <div class="surface-grid" id="lightControlGrid">
+                    <!-- 由 JS 動態生成 -->
+                </div>
+            </div>
+        </div>
+<div class="card" data-lock-while-switching>
             <div class="card-body">
                 <h6 class="card-subtitle mb-3 text-muted">
                     <i class="bi bi-tools"></i> 工作畫面
@@ -486,10 +586,8 @@
                     </div>
                 </div>
             </div>
-        </div>
-
-        <!-- Logo 疊圖：s1、s2 共用，切換方案時也能操作 -->
-        <div class="card" id="logoCard">
+        </div></section>
+<section class="control-panel" id="panel-logo" role="tabpanel" aria-labelledby="tab-logo" tabindex="0" hidden><div class="card" id="logoCard">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <h6 class="card-subtitle text-muted mb-0">
@@ -551,44 +649,8 @@
                     <i class="bi bi-info-circle"></i> PNG 或 JPEG（透明背景請用 PNG），疊在桌面畫面最上層；s1、s2 共用同一張
                 </small>
             </div>
-        </div>
-
-        <!-- Area 控制 -->
-        <div class="card" id="areaControls" data-lock-while-switching>
-            <div class="card-body">
-                <h6 class="card-subtitle mb-3 text-muted">
-                    <i class="bi bi-grid"></i> 區域控制
-                </h6>
-                <div id="areaControlGroups">
-                    <!-- 由 JS 依目前投影方案產生 -->
-                </div>
-                <div class="mt-3">
-                    <button class="btn btn-sm btn-outline-primary w-100" id="enableAllAreas" onclick="toggleAllSurfaces(true)">
-                        <i class="bi bi-check-all"></i> 全部開啟
-                    </button>
-                </div>
-                <div class="mt-2">
-                    <button class="btn btn-sm btn-outline-secondary w-100" id="disableAllAreas" onclick="toggleAllSurfaces(false)">
-                        <i class="bi bi-x-circle"></i> 全部關閉
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <!-- 工作燈開關 -->
-        <div class="card" id="lightControls">
-            <div class="card-body">
-                <h6 class="card-subtitle mb-3 text-muted">
-                    <i class="bi bi-lightbulb"></i> 工作燈開關
-                </h6>
-                <div class="surface-grid" id="lightControlGrid">
-                    <!-- 由 JS 動態生成 -->
-                </div>
-            </div>
-        </div>
-
-                <!-- 自動循環控制 -->
-        <div class="card" data-lock-while-switching>
+        </div></section>
+<section class="control-panel" id="panel-settings" role="tabpanel" aria-labelledby="tab-settings" tabindex="0" hidden><div class="card" data-lock-while-switching>
             <div class="card-body">
                 <h6 class="card-subtitle mb-3 text-muted">
                     <i class="bi bi-arrow-repeat"></i> 自動循環切換
@@ -651,9 +713,7 @@
                 </small>
             </div>
         </div>
-
-        <!-- 連線資訊 -->
-        <div class="card">
+<div class="card">
             <div class="card-body">
                 <h6 class="card-subtitle mb-3 text-muted">
                     <i class="bi bi-info-circle"></i> 連線資訊
@@ -669,7 +729,7 @@
                     </div>
                 </div>
             </div>
-        </div>
+        </div></section>
     </div>
 
     <div id="toast" class="alert alert-dark position-fixed bottom-0 start-50 translate-middle-x mb-3 py-2 px-3"></div>
@@ -677,6 +737,31 @@
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     <script src="control-settings.js"></script>
     <script>
+        // Navigation never changes playback or the active projection profile.
+        const consoleTabs = Array.from(document.querySelectorAll('[data-tab]'));
+        function selectConsoleTab(tab) {
+            consoleTabs.forEach(button => {
+                const selected = button === tab;
+                button.setAttribute('aria-selected', String(selected));
+                button.tabIndex = selected ? 0 : -1;
+                document.getElementById(button.getAttribute('aria-controls')).hidden = !selected;
+            });
+        }
+        consoleTabs.forEach((tab, index) => {
+            tab.addEventListener('click', () => selectConsoleTab(tab));
+            tab.addEventListener('keydown', event => {
+                let next;
+                if (event.key === 'ArrowRight') next = (index + 1) % consoleTabs.length;
+                if (event.key === 'ArrowLeft') next = (index + consoleTabs.length - 1) % consoleTabs.length;
+                if (event.key === 'Home') next = 0;
+                if (event.key === 'End') next = consoleTabs.length - 1;
+                if (next === undefined) return;
+                event.preventDefault();
+                selectConsoleTab(consoleTabs[next]);
+                consoleTabs[next].focus();
+            });
+        });
+
         //#region settings
         // 現場伺服器是 192.168.0.201；辦公室或本機測試在網址加 ?server=10.0.1.251 或 ?server=127.0.0.1。
         const serverUrl = new URLSearchParams(location.search).get('server') || '192.168.0.201';
@@ -813,8 +898,9 @@
 
         // 建立 Surface 切換元件
         function createSurfaceToggle(surface) {
-            const div = document.createElement('div');
+            const div = document.createElement('button');
             div.className = 'surface-toggle';
+            div.type = 'button';
             div.id = `surface-${surface.SurfaceName}`;
             div.onclick = () => toggleSingleSurface(surface.SurfaceName);
             
@@ -852,7 +938,10 @@
             if (!profile) return;
             renderedProfileId = profile.id;
 
-            document.getElementById('currentProfile').textContent = profile.label;
+            const description = ControlSettings.describeProfile(profile, modeNames);
+            document.getElementById('currentProfile').textContent = description.title;
+            document.getElementById('profileGuideTitle').textContent = description.title;
+            document.getElementById('profileGuideText').textContent = `${description.summary}。${description.seatRule}。背景、座位、遮罩與區域設定各版本分別保存；工作燈與 Logo 共用。`;
             document.getElementById('groundCard').style.display = profile.ground ? '' : 'none';
 
             const label8 = (profile.modeLabels && profile.modeLabels['8']) || '星空';
@@ -953,10 +1042,11 @@
             const hint = document.getElementById('seatLockHint');
             const seatsUnavailable = !profile || !ControlSettings.isSeatPanelAvailable(profile, mode);
             panel.classList.toggle('disabled-section', seatsUnavailable);
-            hint.textContent = profile && profile.seatOnlyInModes.length > 0
-                ? `(僅在${profile.seatOnlyInModes.map(m => modeNames[m] || m).join('、')}下可用)`
-                : '(稻田／水草背景下無座位效果)';
-            hint.style.display = seatsUnavailable ? 'block' : 'none';
+            panel.querySelectorAll('button').forEach(button => { button.disabled = seatsUnavailable; });
+            hint.textContent = profile ? ControlSettings.describeProfile(profile, modeNames).seatRule : '等待方案同步';
+            hint.classList.toggle('text-danger', seatsUnavailable);
+            hint.classList.toggle('text-muted', !seatsUnavailable);
+            hint.style.display = 'block';
         }
 
         // 更新下拉選單 UI
@@ -1134,7 +1224,13 @@
                 const isActive = profile.id === activeProfileId;
                 button.className = `btn mask-mode-btn w-100 ${isActive ? 'btn-primary active' : 'btn-outline-secondary'}`;
                 button.disabled = switching || !agentConnected;
-                button.innerHTML = `<div>${profile.label}</div><small>${profile.id}</small>`;
+                const description = ControlSettings.describeProfile(profile, modeNames);
+                const title = document.createElement('div');
+                title.textContent = `${description.title}${isActive ? ' · 目前使用' : ''}`;
+                const summary = document.createElement('small');
+                summary.textContent = description.summary;
+                button.append(title, summary);
+                button.setAttribute('aria-pressed', String(isActive));
                 button.onclick = () => switchProfile(profile.id);
                 column.appendChild(button);
                 container.appendChild(column);

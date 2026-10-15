@@ -61,7 +61,22 @@
         return !profile.seatLockedInModes.includes(contentMode);
     }
 
+    function describeProfile(profile, modeNames) {
+        const names = values => values.map(value => (profile.modeLabels || {})[value] || modeNames[value] || String(value)).join('／');
+        const seatRule = profile.seatOnlyInModes.length
+            ? `僅在「${names(profile.seatOnlyInModes)}」可調整座位`
+            : profile.seatLockedInModes.length
+                ? `「${names(profile.seatLockedInModes)}」背景停用座位效果`
+                : '所有背景皆可調整座位';
+        return {
+            title: `${profile.id.toUpperCase()} · ${profile.label}`,
+            summary: `${profile.seatCount} 席 · ${profile.ground ? '獨立地面控制' : '無獨立地面'} · ${profile.areas.length} 個投影區域`,
+            seatRule
+        };
+    }
+
     return Object.freeze({
+        describeProfile,
         SEAT_COUNT,
         LIGHT_NAMES,
         LIGHT_LABELS,

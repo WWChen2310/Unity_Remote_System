@@ -3,9 +3,18 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
+const fs = require('node:fs');
+const vm = require('node:vm');
 const { execFileSync } = require('node:child_process');
 
 const repositoryRoot = path.join(__dirname, '..');
+
+test('console inline scripts parse', () => {
+  const html = fs.readFileSync(path.join(repositoryRoot, 'interface', 'console.html'), 'utf8');
+  for (const match of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)) {
+    assert.doesNotThrow(() => new vm.Script(match[1]));
+  }
+});
 
 // integrated-server.js 開始監聽埠號，所以不能直接 require 進測試。
 // 沒有任何測試載入它的結果是：它整支壞掉時 npm test 仍然全綠，
