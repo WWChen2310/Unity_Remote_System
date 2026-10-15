@@ -105,7 +105,7 @@ Node 連上 agent 後會自動確保目前方案在跑；現場重開機後只�
 ## Logo 疊圖
 
 - 控制台的「Logo 疊圖」卡片：上傳 PNG／JPEG（透明背景用 PNG，上限 4 MB；超過 2048 px 的圖瀏覽器會先縮小）、開關、大小、角度、水平／垂直位置。
-- Logo 疊在所選輸出畫面的最上層，一次只疊一處：「桌面」（第二版的 `Room_Tables`、第一版的 `Spout Sender`）或「地面」（`Room_Ground`，只有第二版有；第一版選地面時不顯示）。控制台的預覽比例會跟著切換（桌面 3480×1920，地面 1024×1024）。第一版、第二版共用同一張圖與同一組設定（含輸出畫面），切換方案不會改變；切換途中也可以操作。
+- Logo 疊在所選輸出畫面的最上層，一次只疊一處：「桌面」（第二版的 `Room_Tables`、第一版的 `Spout Sender`）或「地面」（`Room_Ground`，只有第二版有；第一版沒有桌面與地面之分，控制台不顯示這個切換）。控制台的預覽比例會跟著切換（桌面 3480×1920，地面 1024×1024）。第一版、第二版共用同一張圖與同一組設定（含輸出畫面），切換方案不會改變；切換途中也可以操作。
 - 設定欄位 `logo.target`：`tables`（預設）或 `ground`，由 `logoControl` 帶 `target` 切換；舊狀態檔沒有這個欄位時視為 `tables`。
 - 圖存在 `system_state.json` 旁邊的 `room-logo.png` 或 `room-logo.jpg`（已加入 `.gitignore`），狀態檔只記 `logo.imageId`。搬機器時兩個檔案要一起帶走；只有狀態檔沒有圖時，Node 啟動會把 Logo 清掉並關閉。
 - 協定：控制台送 `uploadLogo`、`logoControl`、`removeLogo`、`requestLogoImage`；Node 廣播 `logoUpdate`（設定）與 `logoImage`（圖，base64），`systemStateUpdate.state.logo` 也帶設定。細節見 `logo-model.js`。

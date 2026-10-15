@@ -606,7 +606,6 @@
                     <button type="button" class="btn btn-sm btn-outline-primary" data-logo-target="ground"
                             onclick="setLogoTarget('ground')">地面 Room_Ground</button>
                 </div>
-                <small class="text-muted d-block mb-2" id="logoTargetNote" style="display:none;"></small>
 
                 <div class="logo-preview logo-off" id="logoPreview">
                     <img id="logoPreviewImage" alt="" style="display:none;">
@@ -1611,18 +1610,16 @@
             document.getElementById('logoUploadText').textContent =
                 logoUploading ? '上傳中…' : (hasImage ? '更換 Logo' : '上傳 Logo');
 
-            // 地面輸出只有第二版有（profile.ground）；第一版選了地面也不會畫，提示出來避免以為壞了。
+            // 地面輸出只有第二版有（profile.ground）。第一版沒有桌面／地面之分，不顯示切換，
+            // 一律當桌面（第一版的 Unity 也不認 target，永遠畫在它唯一的輸出上）。
             const hasGround = Boolean(activeProfile() && activeProfile().ground);
-            const target = logoSettings.target === 'ground' ? 'ground' : 'tables';
+            const target = hasGround && logoSettings.target === 'ground' ? 'ground' : 'tables';
+            document.getElementById('logoTargetGroup').style.display = hasGround ? '' : 'none';
             document.querySelectorAll('#logoTargetGroup [data-logo-target]').forEach(button => {
                 const isSelected = button.dataset.logoTarget === target;
                 button.classList.toggle('active', isSelected);
                 button.setAttribute('aria-pressed', String(isSelected));
-                if (button.dataset.logoTarget === 'ground') button.disabled = !hasGround && !isSelected;
             });
-            const note = document.getElementById('logoTargetNote');
-            note.textContent = target === 'ground' && !hasGround ? '目前版本沒有地面輸出，Logo 不會顯示。' : '';
-            note.style.display = note.textContent ? '' : 'none';
             document.getElementById('logoPreview').style.aspectRatio = target === 'ground' ? '1 / 1' : '';
 
             const percent = v => Math.round(v * 100);
