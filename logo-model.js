@@ -1,6 +1,6 @@
 'use strict';
 
-// 疊在桌面輸出最上層的 Logo：設定正規化與上傳圖檔的驗證。
+// 疊在桌面或地面輸出最上層的 Logo：設定正規化與上傳圖檔的驗證。
 // Logo 是全域的，不屬於任何投影方案：s1、s2 共用同一張圖與同一組設定，切換方案不會改變它。
 // 這裡不碰網路與檔案，全部可以直接測試。
 
@@ -23,8 +23,13 @@ const LOGO_LIMITS = Object.freeze({
   y: Object.freeze({ min: 0, max: 1 }),
 });
 
+// 疊在哪一張 Spout 輸出：tables 是桌面（s2 的 Room_Tables、s1 的 Spout Sender），ground 是 Room_Ground。
+// 一次只疊一處。s1 沒有地面輸出，選 ground 時 s1 什麼都不畫。
+const LOGO_TARGETS = Object.freeze(['tables', 'ground']);
+
 const DEFAULT_LOGO = Object.freeze({
   enabled: false,
+  target: 'tables',
   scale: 0.2,
   rotation: 0,
   x: 0.5,
@@ -58,6 +63,7 @@ function normalizeLogoSettings(raw) {
     enabled: hasImage && source.enabled === true,
     imageId: hasImage ? source.imageId : null,
     mime: hasImage ? source.mime : null,
+    target: LOGO_TARGETS.includes(source.target) ? source.target : DEFAULT_LOGO.target,
   };
   for (const field of ADJUSTABLE_FIELDS) {
     logo[field] = readNumber(source[field], field, DEFAULT_LOGO[field]);
@@ -81,6 +87,14 @@ function applyLogoControl(current, command) {
       return { error: 'noLogoImage' };
     }
     next.enabled = command.enabled;
+    changed = true;
+  }
+
+  if (command.target !== undefined) {
+    if (!LOGO_TARGETS.includes(command.target)) {
+      return { error: 'invalidLogoSettings' };
+    }
+    next.target = command.target;
     changed = true;
   }
 
@@ -151,6 +165,7 @@ module.exports = {
   LOGO_FORMATS,
   MAX_LOGO_BYTES,
   LOGO_LIMITS,
+  LOGO_TARGETS,
   DEFAULT_LOGO,
   normalizeLogoSettings,
   applyLogoControl,

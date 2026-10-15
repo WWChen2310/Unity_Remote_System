@@ -69,7 +69,7 @@
                 ? `「${names(profile.seatLockedInModes)}」背景停用座位效果`
                 : '所有背景皆可調整座位';
         return {
-            title: `${profile.id.toUpperCase()} · ${profile.label}`,
+            title: profile.label,
             summary: `${profile.seatCount} 席 · ${profile.ground ? '獨立地面控制' : '無獨立地面'} · ${profile.areas.length} 個投影區域`,
             seatRule
         };

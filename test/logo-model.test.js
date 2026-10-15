@@ -57,3 +57,15 @@ test('uploads reject other formats, mismatched bytes and oversized files', () =>
   const huge = Buffer.concat([PNG, Buffer.alloc(MAX_LOGO_BYTES)]);
   assert.equal(parseLogoUpload(dataUrl('image/png', huge)).error, 'logoTooLarge');
 });
+
+test('the output target defaults to tables and only accepts tables or ground', () => {
+  assert.equal(DEFAULT_LOGO.target, 'tables');
+  assert.equal(normalizeLogoSettings({ target: 'ground' }).target, 'ground');
+  assert.equal(normalizeLogoSettings({ target: 'elsewhere' }).target, 'tables');
+  assert.equal(normalizeLogoSettings({}).target, 'tables', 'a state file from before this field existed');
+
+  const current = { ...DEFAULT_LOGO };
+  assert.equal(applyLogoControl(current, { target: 'ground' }).logo.target, 'ground');
+  assert.equal(applyLogoControl(current, { target: 'both' }).error, 'invalidLogoSettings');
+  assert.equal(applyLogoControl(current, { target: 1 }).error, 'invalidLogoSettings');
+});

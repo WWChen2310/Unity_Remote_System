@@ -122,7 +122,7 @@
             display: none;
         }
 
-        /* Logo 疊圖：預覽框比例與桌面輸出（3480×1920）相同 */
+        /* Logo 疊圖：預覽框比例預設與桌面輸出（3480×1920）相同；選地面時改成地面輸出的 1:1（1024×1024），由 renderLogo 設定 */
         .logo-preview {
             position: relative;
             width: 100%;
@@ -600,6 +600,14 @@
                     </div>
                 </div>
 
+                <div class="btn-group w-100 mb-2" role="group" aria-label="Logo 輸出畫面" id="logoTargetGroup">
+                    <button type="button" class="btn btn-sm btn-outline-primary" data-logo-target="tables"
+                            onclick="setLogoTarget('tables')">桌面 Room_Tables</button>
+                    <button type="button" class="btn btn-sm btn-outline-primary" data-logo-target="ground"
+                            onclick="setLogoTarget('ground')">地面 Room_Ground</button>
+                </div>
+                <small class="text-muted d-block mb-2" id="logoTargetNote" style="display:none;"></small>
+
                 <div class="logo-preview logo-off" id="logoPreview">
                     <img id="logoPreviewImage" alt="" style="display:none;">
                     <div class="logo-empty" id="logoPreviewEmpty">尚未上傳 Logo</div>
@@ -646,7 +654,7 @@
                     </button>
                 </div>
                 <small class="text-muted d-block mt-2">
-                    <i class="bi bi-info-circle"></i> PNG 或 JPEG（透明背景請用 PNG），疊在桌面畫面最上層；s1、s2 共用同一張
+                    <i class="bi bi-info-circle"></i> PNG 或 JPEG（透明背景請用 PNG），疊在所選輸出畫面的最上層（一次只疊一處）；第一版、第二版共用同一張圖與設定
                 </small>
             </div>
         </div></section>
@@ -943,6 +951,7 @@
             document.getElementById('profileGuideTitle').textContent = description.title;
             document.getElementById('profileGuideText').textContent = `${description.summary}。${description.seatRule}。背景、座位、遮罩與區域設定各版本分別保存；工作燈與 Logo 共用。`;
             document.getElementById('groundCard').style.display = profile.ground ? '' : 'none';
+            renderLogo();
 
             const label8 = (profile.modeLabels && profile.modeLabels['8']) || '星空';
             document.getElementById('content8Label').textContent = label8;
@@ -1291,9 +1300,14 @@
             document.getElementById('profileElapsed').textContent = `${seconds} 秒`;
         }
 
+        // 代理回報的名稱是「<方案代號>-<角色>」，代號換成控制台顯示的版本名稱。
+        function exitInstanceName(exit) {
+            return exit.name.startsWith(exit.profileId) ? profileLabel(exit.profileId) + exit.name.slice(exit.profileId.length) : exit.name;
+        }
+
         function renderRoomStatus() {
             const text = connectedRooms.length > 0
-                ? `Unity：${connectedRooms.map(room => `${room.build}/${room.role}`).join('、')} 已連線`
+                ? `Unity：${connectedRooms.map(room => `${profileLabel(room.build)}/${room.role}`).join('、')} 已連線`
                 : 'Unity：未連線';
             document.getElementById('roomsText').textContent = text;
 
@@ -1302,7 +1316,7 @@
             alertBox.style.display = show ? '' : 'none';
             if (show) {
                 document.getElementById('roomExitText').textContent =
-                    `Unity（${lastExit.name}）在 ${new Date(lastExit.at).toLocaleTimeString('zh-TW')} 非預期結束。`;
+                    `Unity（${exitInstanceName(lastExit)}）在 ${new Date(lastExit.at).toLocaleTimeString('zh-TW')} 非預期結束。`;
             }
         }
 
@@ -1468,7 +1482,7 @@
         //#region logo
 
         // 伺服器上的 Logo 設定；圖另外以 logoImage 送來，用 imageId 對應。
-        let logoSettings = { enabled: false, scale: 0.2, rotation: 0, x: 0.5, y: 0.5, imageId: null };
+        let logoSettings = { enabled: false, target: 'tables', scale: 0.2, rotation: 0, x: 0.5, y: 0.5, imageId: null };
         let logoImageId = null;
         let logoUploading = false;
         // 拖曳滑桿時節流送出；節流期間最後一個值一定會送到。
@@ -1495,6 +1509,11 @@
                 return;
             }
             sendLogo({ type: 'logoControl', enabled });
+        }
+
+        function setLogoTarget(target) {
+            if (logoSettings.target === target) return;
+            sendLogo({ type: 'logoControl', target });
         }
 
         function onLogoSlider(field, value) {
@@ -1591,6 +1610,20 @@
             document.getElementById('logoRemove').disabled = !hasImage;
             document.getElementById('logoUploadText').textContent =
                 logoUploading ? '上傳中…' : (hasImage ? '更換 Logo' : '上傳 Logo');
+
+            // 地面輸出只有第二版有（profile.ground）；第一版選了地面也不會畫，提示出來避免以為壞了。
+            const hasGround = Boolean(activeProfile() && activeProfile().ground);
+            const target = logoSettings.target === 'ground' ? 'ground' : 'tables';
+            document.querySelectorAll('#logoTargetGroup [data-logo-target]').forEach(button => {
+                const isSelected = button.dataset.logoTarget === target;
+                button.classList.toggle('active', isSelected);
+                button.setAttribute('aria-pressed', String(isSelected));
+                if (button.dataset.logoTarget === 'ground') button.disabled = !hasGround && !isSelected;
+            });
+            const note = document.getElementById('logoTargetNote');
+            note.textContent = target === 'ground' && !hasGround ? '目前版本沒有地面輸出，Logo 不會顯示。' : '';
+            note.style.display = note.textContent ? '' : 'none';
+            document.getElementById('logoPreview').style.aspectRatio = target === 'ground' ? '1 / 1' : '';
 
             const percent = v => Math.round(v * 100);
             const sliders = {

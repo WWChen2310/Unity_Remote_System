@@ -7,7 +7,7 @@
   "defaultProfile": "s2",
   "profiles": {
     "s1": {
-      "label": "2026-03 版",
+      "label": "第一版",
       "rooms": ["both"],
       "seatCount": 8,
       "seatOrder": "reversed",
@@ -23,7 +23,7 @@
       "settleSec": 3
     },
     "s2": {
-      "label": "2026-07 版",
+      "label": "第二版",
       "rooms": ["tables", "ground"],
       "seatCount": 9,
       "seatOrder": "direct",

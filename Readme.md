@@ -5,14 +5,14 @@
 - 執行環境需為 `Node.js >= 18.1`。在本專案根目錄先執行 `npm ci`；沒有 lockfile 的情況才改用 `npm install`。
 - `madmapper.config.json` 是 MadMapper OSC 的唯一部署設定來源。請在 Node JSON 內修改 `ip`、`port`、`localPort`，以及每個區域完整的 `oscAddress`；OSC Address 不在 Unity Inspector 編輯。
 - 區域依投影方案分組，寫在 `profiles.<id>.areas`；工作燈寫在全域的 `lights`。舊格式（頂層 `areas`）會讓伺服器拒絕啟動，請改成新格式。
-- s2（2026-07 版）的六個固定名稱依序為 `Main`、`T1`、`T2`、`T3`、`T4`、`Ground`。預設位址分別是 `/surfaces/Main/opacity`、`/surfaces/T1/opacity`、`/surfaces/T2/opacity`、`/surfaces/T3/opacity`、`/surfaces/T4/opacity`、`/surfaces/Ground/opacity`。完整 `oscAddress` 字串皆可依 MadMapper 實際命名修改。
+- 第二版（2026-07，內部代號 s2）的六個固定名稱依序為 `Main`、`T1`、`T2`、`T3`、`T4`、`Ground`。預設位址分別是 `/surfaces/Main/opacity`、`/surfaces/T1/opacity`、`/surfaces/T2/opacity`、`/surfaces/T3/opacity`、`/surfaces/T4/opacity`、`/surfaces/Ground/opacity`。完整 `oscAddress` 字串皆可依 MadMapper 實際命名修改。
 - 首次啟動可執行 `npm start`（等同 `node integrated-server.js`）。修改 JSON 後必須重啟 Node：使用 PM2 時執行 `pm2 restart <應用程式名稱>`；直接啟動時先停止舊程序，再重新執行啟動指令。
-- s1（2026-03 版）沿用當時的 15 個 surface：`Main-1`、`T1-1`～`T7-1`（模式一，預設開）與 `Main-2`、`T2-2`～`T7-2`（模式二，預設關），位址為 `/surfaces/<名稱>/opacity`。
+- 第一版（2026-03，內部代號 s1）沿用當時的 15 個 surface：`Main-1`、`T1-1`～`T7-1`（模式一，預設開）與 `Main-2`、`T2-2`～`T7-2`（模式二，預設關），位址為 `/surfaces/<名稱>/opacity`。
 - Node.js 負責傳送 OSC 給 MadMapper；Unity 不會傳送 OSC，也不需要安裝 Unity OSC 套件。
 
-## Unity 九座位設定（s2）
+## Unity 九座位設定（第二版）
 
-- 本節描述 s2。s1 為 8 席，座位順序由 Node 轉成 2026-03 版要的反轉順序（座位 1 → Region 7），s1 的 Unity 不需設定。
+- 本節描述第二版。第一版為 8 席，座位順序由 Node 轉成 2026-03 版要的反轉順序（座位 1 → Region 7），第一版的 Unity 不需設定。
 - Unity 實際控制檔位於 `Assets/Script/Singleton/UnityModeController.cs`，其 `SeatCount = 9`。
 - WebSocket 的直接座位對應為 `Seat1` → `0`、`Seat2` → `1`、`Seat3` → `2`、`Seat4` → `3`、`Seat5` → `4`、`Seat6` → `5`、`Seat7` → `6`、`Seat8` → `7`、`Seat9` → `8`。
 - 在 `RegionManager` 新增 `Region ID 8`，並在 `CloudMaterials` 加入第九個材質，也就是 `CloudMaterials[8]`。
@@ -26,20 +26,22 @@ Web 伺服器必須同時部署 `interface/console.html` 與 `interface/control-
 
 控制台預設連 `192.168.0.201`（現場的 Node）。辦公室或本機測試不必改原始碼，在網址加 `?server=`，例如 `console.html?server=10.0.1.251` 或 `console.html?server=127.0.0.1`。
 
-## 投影方案切換（s1／s2）
+## 投影方案切換（第一版／第二版）
+
+控制台只顯示「第一版」「第二版」；`s1`、`s2` 是設定檔、狀態檔、`build-info.json` 與資料夾使用的內部代號，不會出現在畫面上。
 
 控制台以 iPad 為主要操作裝置，分為「內容播放、座位控制、投影與燈光、Logo 疊圖、循環與資訊」五個標籤頁。每頁卡片依序排列，避免不同高度的卡片造成大片留白；座位面板在平板每列兩席，手機每列一席。支援直向、橫向與頁面縮放，主要按鈕至少 44px 高。上方持續顯示目前狀態與版本選擇，版本規則可展開查看。標籤切換只改變顯示頁面，不改變播放或方案；開啟頁面時沿用伺服器目前方案。
 
-- S1：8 席，只有「分割內容」可操作座位，狀態為預設／海洋／森林／液態食物；不顯示獨立地面控制，投影區域依模式一／模式二分組。
-- S2：9 席，座位增加關燈／開燈，稻田／水草背景下停用座位效果；地面內容可獨立切換。
+- 第一版（s1）：8 席，只有「分割內容」可操作座位，狀態為預設／海洋／森林／液態食物；不顯示獨立地面控制，投影區域依模式一／模式二分組。
+- 第二版（s2）：9 席，座位增加關燈／開燈，稻田／水草背景下停用座位效果；地面內容可獨立切換。
 - 各版本分別保存背景、座位、遮罩與投影區域；工作燈與 Logo 共用，切換期間仍可操作。
 
 控制台最上方的「投影方案」可以切換兩套投影方式與內容：
 
 | 方案 | 內容 | Unity | MadMapper surface |
 |---|---|---|---|
-| s1 | 2026-03 版（`release/s1`，`dadf77a`） | `C:\Room\S1\RoomS1.exe`，單一實例 | 15 個 `*-1`／`*-2` |
-| s2 | 2026-07 版（`main`） | `C:\Room\S2\RoomS2.exe`，tables 與 ground 兩個實例 | 六區 |
+| 第一版（s1） | 2026-03 版（`release/s1`，`dadf77a`） | `C:\Room\S1\RoomS1.exe`，單一實例 | 15 個 `*-1`／`*-2` |
+| 第二版（s2） | 2026-07 版（`main`） | `C:\Room\S2\RoomS2.exe`，tables 與 ground 兩個實例 | 六區 |
 
 可執行檔名稱分別是 `RoomS1.exe` 與 `RoomS2.exe`。
 
@@ -103,7 +105,8 @@ Node 連上 agent 後會自動確保目前方案在跑；現場重開機後只�
 ## Logo 疊圖
 
 - 控制台的「Logo 疊圖」卡片：上傳 PNG／JPEG（透明背景用 PNG，上限 4 MB；超過 2048 px 的圖瀏覽器會先縮小）、開關、大小、角度、水平／垂直位置。
-- Logo 疊在桌面輸出最上層（s2 的 `Room_Tables`、s1 的 `Spout Sender`），地面不疊。s1、s2 共用同一張圖與同一組設定，切換方案不會改變；切換途中也可以操作。
+- Logo 疊在所選輸出畫面的最上層，一次只疊一處：「桌面」（第二版的 `Room_Tables`、第一版的 `Spout Sender`）或「地面」（`Room_Ground`，只有第二版有；第一版選地面時不顯示）。控制台的預覽比例會跟著切換（桌面 3480×1920，地面 1024×1024）。第一版、第二版共用同一張圖與同一組設定（含輸出畫面），切換方案不會改變；切換途中也可以操作。
+- 設定欄位 `logo.target`：`tables`（預設）或 `ground`，由 `logoControl` 帶 `target` 切換；舊狀態檔沒有這個欄位時視為 `tables`。
 - 圖存在 `system_state.json` 旁邊的 `room-logo.png` 或 `room-logo.jpg`（已加入 `.gitignore`），狀態檔只記 `logo.imageId`。搬機器時兩個檔案要一起帶走；只有狀態檔沒有圖時，Node 啟動會把 Logo 清掉並關閉。
 - 協定：控制台送 `uploadLogo`、`logoControl`、`removeLogo`、`requestLogoImage`；Node 廣播 `logoUpdate`（設定）與 `logoImage`（圖，base64），`systemStateUpdate.state.logo` 也帶設定。細節見 `logo-model.js`。
 - Unity 端需要含 `RoomLogoOverlay` 的 build（main 與 release/s1 都要重新建置）；舊 build 收到這些訊息會直接忽略。
