@@ -152,6 +152,8 @@ class ProfileSwitcher {
    */
   applyMadmapper(activeProfileId, { areasOn }) {
     const saved = this.store.get().profiles[activeProfileId];
+    const others = this.profiles.ids.filter((profileId) => profileId !== activeProfileId);
+    this.log(`MadMapper: ${others.join(', ')} off; ${activeProfileId} areas ${areasOn ? 'as saved' : 'off'}, lights as saved`);
     for (const profileId of this.profiles.ids) {
       const { areas, lights, targetMap } = this.madmapper.profiles[profileId];
       const isActive = profileId === activeProfileId;
