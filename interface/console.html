@@ -296,6 +296,18 @@
             color: var(--bs-success, #198754);
             font-weight: 600;
         }
+        .area-group-title .area-group-locked {
+            color: #6c757d;
+            font-weight: 400;
+        }
+        .area-group.locked .surface-grid {
+            opacity: 0.45;
+            filter: grayscale(100%);
+        }
+        .surface-toggle:disabled {
+            cursor: not-allowed;
+            opacity: 0.55;
+        }
         .area-group-actions .btn {
             min-height: 32px;
             padding: 2px 10px;
@@ -436,7 +448,7 @@
                     <div class="progress mt-2" style="height: 6px;">
                         <div class="progress-bar progress-bar-striped progress-bar-animated" id="profileProgressBar" style="width: 0%"></div>
                     </div>
-                    <small class="text-muted d-block mt-2">切換期間 Unity 會重新啟動，播放相關控制暫停；MadMapper 區域不會自動開關，需要遮住畫面請先在「投影與燈光」關閉區域。區域、工作燈與 Logo 隨時可操作。</small>
+                    <small class="text-muted d-block mt-2">切換期間全場黑畫面（MadMapper 區域全關），播放控制暫停；新版本就緒後自動恢復該版的區域。另一版的區域與工作燈會關閉並鎖住；目前版本的工作燈與 Logo 仍可操作。</small>
                 </div>
                 <div class="alert alert-danger mt-3 mb-0" id="profileError" style="display:none;">
                     <div id="profileErrorText"></div>
@@ -555,7 +567,7 @@
                 <h6 class="card-subtitle mb-1 text-muted">
                     <i class="bi bi-grid"></i> MadMapper 區域與工作燈
                 </h6>
-                <small class="text-muted d-block mb-3">直接開關 MadMapper 的投影區域與工作燈，每個版本各自一組，與 Unity 播放哪一版無關；切換版本不會自動開關，切換中也可以操作。</small>
+                <small class="text-muted d-block mb-3">每個版本各自一組區域與工作燈，跟著目前版本：只能操作目前版本，另一版在 MadMapper 上是關的、這裡鎖住。切換時會先全關，就緒後恢復新版本上次的開關；切換中區域鎖住，工作燈仍可操作。</small>
                 <div id="areaControlGroups">
                     <!-- 由 JS 依 profileCatalog 產生，每個版本一組 -->
                 </div>
@@ -771,7 +783,6 @@
         
         let ws = null;
         let currentContentMode = 1;
-        let currentMaskMode = 1;
         let surfaceStates = {};
         
         // 自動循環相關變數
@@ -789,9 +800,11 @@
         let connectedRooms = [];
 
         const SWITCH_STEP_LABELS = {
+            blackout: '熄燈中',
             starting: '啟動 Unity',
             waitingForRooms: '等待 Unity 連線',
-            settling: '等待畫面穩定'
+            settling: '等待畫面穩定',
+            restoring: '恢復投影'
         };
         const SWITCH_STEPS = Object.keys(SWITCH_STEP_LABELS);
 
@@ -799,12 +812,12 @@
             switching: '投影方案切換中，請稍候',
             seatLocked: '目前背景下座位無法操作',
             seatOutOfRange: '這個投影方案沒有這個座位狀態',
-            unknownSurface: '伺服器不認得這個區域，請重新整理控制台',
+            notInProfile: '這個區域屬於另一個版本，切換到該版本才能操作',
             groundUnsupported: '這個投影方案沒有地面內容',
             agentOffline: 'Unity 主機的代理程式離線，無法切換投影方案',
             unknownProfile: '找不到這個投影方案',
             invalidMode: '無效的背景',
-            invalidMask: '無效的遮罩',
+            maskFollowsProfile: '遮罩跟著版本自動切換，不能另外指定',
             invalidGroundTheme: '無效的地面內容',
             noLogoImage: '請先上傳 Logo',
             invalidLogoSettings: '無效的 Logo 設定',
@@ -847,42 +860,45 @@
             return profileCatalog.find(profile => profile.id === activeProfileId) || null;
         }
 
-        // MadMapper 區域與 Unity 脫鉤：每個版本一組、永遠都顯示，標出目前 Unity 播放的是哪一版。
-        // 按鈕顯示 label（Main、T1…），送給伺服器的是 name（MadMapper 的 surface 名稱，例如 Main-s1）。
+        // MadMapper 區域跟著版本：每個版本一組都顯示，但只有目前版本能操作，另一版鎖住
+        // （伺服器切換時已把它全關）。按鈕顯示 label（Main、T1…），送給伺服器的是 name（例如 Main-s1）。
         function renderAreaGroups() {
             const container = document.getElementById('areaControlGroups');
             container.innerHTML = '';
             profileCatalog.forEach(profile => {
+                const isActive = profile.id === activeProfileId;
                 const wrapper = document.createElement('div');
-                wrapper.className = 'area-group';
+                wrapper.className = `area-group${isActive ? '' : ' locked'}`;
 
                 const head = document.createElement('div');
                 head.className = 'area-group-head';
                 const title = document.createElement('div');
                 title.className = 'area-group-title';
                 title.textContent = profile.label;
-                if (profile.id === activeProfileId) {
-                    const active = document.createElement('span');
-                    active.className = 'area-group-active';
-                    active.textContent = ' · Unity 播放中';
-                    title.appendChild(active);
+                const badge = document.createElement('span');
+                badge.className = isActive ? 'area-group-active' : 'area-group-locked';
+                badge.textContent = isActive ? ' · 目前版本' : ' · 已關閉鎖住（切換到此版才能操作）';
+                title.appendChild(badge);
+                head.appendChild(title);
+                if (isActive) {
+                    const actions = document.createElement('div');
+                    actions.className = 'area-group-actions btn-group';
+                    [[true, '全開', 'btn-outline-primary'], [false, '全關', 'btn-outline-secondary']].forEach(([enabled, text, style]) => {
+                        const button = document.createElement('button');
+                        button.type = 'button';
+                        button.className = `btn btn-sm ${style}`;
+                        button.textContent = text;
+                        button.dataset.surfaceKind = 'area';
+                        button.onclick = () => toggleProfileAreas(profile.id, enabled);
+                        actions.appendChild(button);
+                    });
+                    head.appendChild(actions);
                 }
-                const actions = document.createElement('div');
-                actions.className = 'area-group-actions btn-group';
-                [[true, '全開', 'btn-outline-primary'], [false, '全關', 'btn-outline-secondary']].forEach(([enabled, text, style]) => {
-                    const button = document.createElement('button');
-                    button.type = 'button';
-                    button.className = `btn btn-sm ${style}`;
-                    button.textContent = text;
-                    button.onclick = () => toggleProfileAreas(profile.id, enabled);
-                    actions.appendChild(button);
-                });
-                head.append(title, actions);
                 wrapper.appendChild(head);
 
                 const grid = document.createElement('div');
                 grid.className = 'surface-grid';
-                fillSurfaceGrid(grid, profile.areas.map(area => ({ SurfaceName: area.name, ShowName: area.label || area.name })));
+                fillSurfaceGrid(grid, profile.areas.map(area => ({ SurfaceName: area.name, ShowName: area.label || area.name, kind: 'area' })));
                 wrapper.appendChild(grid);
 
                 // 工作燈與區域一樣是「一個 OSC 位址收 0/1」，共用 madmapperControl；全開／全關不含工作燈。
@@ -894,10 +910,33 @@
                     wrapper.appendChild(lightTitle);
                     const lightGrid = document.createElement('div');
                     lightGrid.className = 'surface-grid light-grid';
-                    fillSurfaceGrid(lightGrid, lights.map(light => ({ SurfaceName: light.name, ShowName: light.label || light.name })));
+                    fillSurfaceGrid(lightGrid, lights.map(light => ({ SurfaceName: light.name, ShowName: light.label || light.name, kind: 'light' })));
                     wrapper.appendChild(lightGrid);
                 }
                 container.appendChild(wrapper);
+            });
+            updateSurfaceLocks();
+        }
+
+        /** 這個區域／工作燈屬於哪個版本（名稱跨版本不重複）。 */
+        function surfaceProfileId(surfaceName) {
+            const owner = profileCatalog.find(profile =>
+                profile.areas.some(area => area.name === surfaceName)
+                || (profile.lights || []).some(light => light.name === surfaceName));
+            return owner ? owner.id : null;
+        }
+
+        /** 另一版一律鎖住；切換中目前版本的區域也鎖住（伺服器會照存檔恢復），工作燈不鎖。 */
+        function isSurfaceLocked(surfaceName, kind) {
+            if (surfaceProfileId(surfaceName) !== activeProfileId) return true;
+            return kind === 'area' && switchState.status === 'switching';
+        }
+
+        function updateSurfaceLocks() {
+            const switching = switchState.status === 'switching';
+            document.querySelectorAll('#areaControlGroups [data-surface-kind]').forEach(element => {
+                const name = element.dataset.surfaceName;
+                element.disabled = name ? isSurfaceLocked(name, element.dataset.surfaceKind) : switching;
             });
         }
 
@@ -907,6 +946,8 @@
             div.className = 'surface-toggle';
             div.type = 'button';
             div.id = `surface-${surface.SurfaceName}`;
+            div.dataset.surfaceName = surface.SurfaceName;
+            div.dataset.surfaceKind = surface.kind;
             div.onclick = () => toggleSingleSurface(surface.SurfaceName);
             
             div.innerHTML = `
@@ -946,7 +987,7 @@
             const description = ControlSettings.describeProfile(profile, modeNames);
             document.getElementById('currentProfile').textContent = description.title;
             document.getElementById('profileGuideTitle').textContent = description.title;
-            document.getElementById('profileGuideText').textContent = `${description.summary}。${description.seatRule}。背景、座位、遮罩、區域與工作燈各版本分別保存；Logo 共用。`;
+            document.getElementById('profileGuideText').textContent = `${description.summary}。${description.seatRule}。背景、座位、區域與工作燈各版本分別保存，物件追蹤遮罩跟著版本切換；Logo 共用。`;
             document.getElementById('groundCard').style.display = profile.ground ? '' : 'none';
             renderLogo();
 
@@ -1074,25 +1115,6 @@
             });
         }
 
-        // Mask 模式切換
-        function switchMaskMode(mode) {
-            if (ws && ws.readyState !== WebSocket.OPEN) {
-                alert('未連接到伺服器!');
-                return;
-            }
-
-            currentMaskMode = mode;
-            
-            // 發送 maskId 到 ObjectTracker
-            ws.send(JSON.stringify({
-                type: 'maskControl',
-                maskId: mode
-            }));
-            
-            console.log(`切換到桌面模式 ${mode},已發送 maskId: ${mode}`);
-
-        }
-
         // 單一 Surface 切換
         function toggleSingleSurface(surfaceName) {
             const surfaceDiv = document.getElementById(`surface-${surfaceName}`);
@@ -1103,6 +1125,9 @@
 
         // 切換 Surface 狀態
         function toggleSurface(surfaceName, enabled) {
+            const element = document.getElementById(`surface-${surfaceName}`);
+            if (element && element.disabled) return;
+
             // 更新本地狀態
             surfaceStates[surfaceName] = enabled;
 
@@ -1125,7 +1150,11 @@
             const statusDiv = document.getElementById(`status-${surfaceName}`);
 
             if (surfaceDiv && statusDiv) {
-                if (enabled) {
+                // 另一版在 MadMapper 上是關的；存檔的開關切回該版才會恢復，這裡不顯示成開啟。
+                if (surfaceProfileId(surfaceName) !== activeProfileId) {
+                    surfaceDiv.classList.remove('active');
+                    statusDiv.textContent = '鎖住';
+                } else if (enabled) {
                     surfaceDiv.classList.add('active');
                     statusDiv.textContent = '開啟';
                 } else {
@@ -1266,6 +1295,7 @@
             document.querySelectorAll('[data-lock-while-switching]').forEach(card => {
                 card.classList.toggle('disabled-section', switching);
             });
+            updateSurfaceLocks();
 
             document.getElementById('profileProgress').style.display = switching ? '' : 'none';
             if (switching) {
@@ -1328,8 +1358,7 @@
                 return;
             }
             if (profileId === activeProfileId && switchState.status === 'idle') return;
-            const message = `切換到「${profileLabel(profileId)}」？\n\n約需 1–2 分鐘，期間 Unity 重新啟動、播放控制暫停。
-MadMapper 區域不會自動關閉，需要的話請先手動關。`;
+            const message = `切換到「${profileLabel(profileId)}」？\n\n約需 1–2 分鐘，期間全場黑畫面，播放控制暫停。\n另一版的區域與工作燈會關閉並鎖住，物件追蹤改用這一版的遮罩。`;
             if (!confirm(message)) return;
             ws.send(JSON.stringify({ type: 'switchProfile', profileId }));
         }
@@ -1339,7 +1368,7 @@ MadMapper 區域不會自動關閉，需要的話請先手動關。`;
                 alert('未連接到伺服器!');
                 return;
             }
-            if (!confirm(`重新啟動「${profileLabel(activeProfileId)}」？\n\n期間 Unity 重新啟動；MadMapper 區域不會自動關閉。`)) return;
+            if (!confirm(`重新啟動「${profileLabel(activeProfileId)}」？\n\n期間全場黑畫面。`)) return;
             ws.send(JSON.stringify({ type: 'restartProfile' }));
         }
 

@@ -32,14 +32,13 @@ const {
   createLogoImageMessage,
 } = require('./logo-model');
 const { RoomPresence } = require('./room-presence');
-const { ProfileSwitcher } = require('./profile-switcher');
+const { SWITCH_STEPS, ProfileSwitcher } = require('./profile-switcher');
 
-// 切換中拒絕的指令（都是 Unity 的）。MadMapper 的 madmapperControl 與切換脫鉤，隨時可用。
+// 切換中拒絕的指令。madmapperControl 在 handler 裡另外判斷：區域擋、工作燈放行（實體燈，與投影無關）。
 const BLOCKED_WHILE_SWITCHING = new Set([
   'switchMode',
   'updateTableMode',
   'switchGroundTheme',
-  'maskControl',
   'switchProfile',
   'restartProfile',
 ]);
@@ -260,38 +259,6 @@ function startServer({
     }));
   }
 
-  // ---- MadMapper ----
-
-  /** 區域名稱在各方案間不重複（control-model 驗證過），所以名稱就能找到它屬於哪個方案。 */
-  function findMadmapperOwner(name) {
-    for (const [profileId, { areaMap, lightMap }] of Object.entries(madmapper.profiles)) {
-      const profileState = state.profiles[profileId];
-      if (Object.prototype.hasOwnProperty.call(areaMap, name)) {
-        return { states: profileState.surfaceStates, targets: areaMap };
-      }
-      if (Object.prototype.hasOwnProperty.call(lightMap, name)) {
-        return { states: profileState.lightStates, targets: lightMap };
-      }
-    }
-    return null;
-  }
-
-  /**
-   * 啟動時把存檔裡每個區域與工作燈的開關送給 MadMapper 一次。MadMapper 重開後會留著
-   * 專案存檔時的開關，這樣才會與控制台看到的一致。之後只有操作者按了才送。
-   */
-  function syncMadmapper() {
-    for (const [profileId, { areas, lights, targetMap }] of Object.entries(madmapper.profiles)) {
-      const { surfaceStates, lightStates } = state.profiles[profileId];
-      for (const { name } of areas) {
-        sendOsc(createMadmapperOscMessage(targetMap, name, surfaceStates[name] === true));
-      }
-      for (const { name } of lights) {
-        sendOsc(createMadmapperOscMessage(targetMap, name, lightStates[name] === true));
-      }
-    }
-  }
-
   // ---- 切換 ----
 
   const switcher = new ProfileSwitcher({
@@ -303,6 +270,8 @@ function startServer({
       },
     },
     profiles,
+    madmapper,
+    sendOsc,
     agent,
     presence,
     ...(delay ? { delay } : {}),
@@ -313,7 +282,7 @@ function startServer({
       // 開始與失敗時送完整狀態（控制台要依新方案重畫，追蹤端要拿到新方案的遮罩）；
       // 中間步驟只送進度，避免追蹤端每一步都重套一次遮罩。
       switchChanged: () => {
-        if (state.switch.status === 'failed' || state.switch.step === 'starting') {
+        if (state.switch.status === 'failed' || state.switch.step === SWITCH_STEPS[0]) {
           publishFullState({ consolesOnly: true });
         } else {
           publishToConsoles({ type: 'profileSwitchUpdate', activeProfile: state.activeProfile, switch: { ...state.switch } });
@@ -427,29 +396,33 @@ function startServer({
       publish(() => ({ type: 'groundThemeUpdate', groundThemeId: data.groundThemeId, timestamp: Date.now() }));
     },
 
-    // 與 Unity 無關：任何方案的區域與工作燈都能隨時開關，不看目前方案、也不看是否切換中。
+    // 與方案綁定：只能開關目前方案的區域與工作燈，其他方案鎖住（切換時已全關）。
+    // 切換中區域也鎖住（恢復步驟會照存檔重送），工作燈照常可用。
     madmapperControl(ws, data) {
       const enabled = data.enabled === true;
-      const owner = findMadmapperOwner(data.surface);
-      if (!owner) {
-        reject(ws, 'madmapperControl', 'unknownSurface');
+      const { areaMap, lightMap, targetMap } = madmapper.profiles[state.activeProfile];
+      const isArea = Object.prototype.hasOwnProperty.call(areaMap, data.surface);
+      const isLight = Object.prototype.hasOwnProperty.call(lightMap, data.surface);
+
+      if (!isArea && !isLight) {
+        reject(ws, 'madmapperControl', 'notInProfile');
+        return;
+      }
+      if (isArea && switcher.isSwitching()) {
+        reject(ws, 'madmapperControl', 'switching');
         return;
       }
 
-      owner.states[data.surface] = enabled;
+      const profileState = activeState();
+      (isArea ? profileState.surfaceStates : profileState.lightStates)[data.surface] = enabled;
       saveState();
-      sendOsc(createMadmapperOscMessage(owner.targets, data.surface, enabled));
+      sendOsc(createMadmapperOscMessage(targetMap, data.surface, enabled));
       publishToConsoles({ type: 'madmapperStatusUpdate', surface: data.surface, enabled }, { exclude: ws });
     },
 
-    maskControl(ws, data) {
-      if (!Number.isInteger(data.maskId) || data.maskId < 0) {
-        reject(ws, 'maskControl', 'invalidMask');
-        return;
-      }
-      activeState().maskMode = data.maskId;
-      saveState();
-      publishToConsoles({ type: 'maskStatusUpdate', maskId: data.maskId }, { exclude: ws });
+    // 遮罩跟著方案走（profiles.config.json 的 maskId），不能另外改。
+    maskControl(ws) {
+      reject(ws, 'maskControl', 'maskFollowsProfile');
     },
 
     switchProfile(ws, data) {
@@ -606,7 +579,9 @@ function startServer({
     wss.once('listening', () => {
       wss.off('error', reject);
       log(`Control server listening on ${wss.address().port}; active profile ${state.activeProfile}`);
-      syncMadmapper();
+      // MadMapper 重開後會留著專案存檔時的開關，啟動時對齊一次：其他方案全關，目前方案照存檔。
+      // 切換途中重啟（failed）時區域維持關閉，等操作者重試或回到原方案。
+      switcher.applyMadmapper(state.activeProfile, { areasOn: state.switch.status === 'idle' });
       resolve({
         port: wss.address().port,
         getState: () => state,

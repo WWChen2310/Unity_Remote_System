@@ -18,7 +18,7 @@
       "resetSeatsOnModes": [8],
       "ground": false,
       "modeLabels": { "8": "分割內容" },
-      "defaultMaskId": 1,
+      "maskId": 1,
       "readyTimeoutSec": 90,
       "settleSec": 3
     },
@@ -34,7 +34,7 @@
       "resetSeatsOnModes": [],
       "ground": true,
       "modeLabels": { "8": "星空" },
-      "defaultMaskId": 1,
+      "maskId": 2,
       "readyTimeoutSec": 120,
       "settleSec": 3
     }

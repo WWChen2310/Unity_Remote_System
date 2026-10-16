@@ -92,6 +92,23 @@ test('validateProfilesConfig rejects a profile that madmapper.config.json has bu
   assert.throws(() => validateProfilesConfig(raw, madmapper, {}), /s1/);
 });
 
+test('each shipped profile uses its own tracker mask', () => {
+  const profiles = validateProfilesConfig(shippedProfiles(), madmapper, {});
+  assert.equal(profiles.byId.s1.maskId, 1);
+  assert.equal(profiles.byId.s2.maskId, 2);
+});
+
+test('validateProfilesConfig refuses the old defaultMaskId and a mask id below 1', () => {
+  const legacy = shippedProfiles();
+  delete legacy.profiles.s1.maskId;
+  legacy.profiles.s1.defaultMaskId = 1;
+  assert.throws(() => validateProfilesConfig(legacy, madmapper, {}), /defaultMaskId was replaced by maskId/);
+
+  const zero = shippedProfiles();
+  zero.profiles.s2.maskId = 0;
+  assert.throws(() => validateProfilesConfig(zero, madmapper, {}), /maskId must be a positive integer/);
+});
+
 // ---- migrateSystemState -----------------------------------------------------
 
 test('migrateSystemState moves a v2 file into profiles.s2 and seeds s1 defaults', () => {
@@ -112,7 +129,7 @@ test('migrateSystemState moves a v2 file into profiles.s2 and seeds s1 defaults'
   assert.equal(state.activeProfile, 's2');
   assert.equal(state.switch.status, 'idle');
   assert.equal(state.profiles.s2.contentMode, 3);
-  assert.equal(state.profiles.s2.maskMode, 2);
+  assert.equal('maskMode' in state.profiles.s2, false, 'the mask follows the profile and is not saved');
   assert.equal(state.profiles.s2.groundThemeId, 'crops');
   assert.deepEqual(state.profiles.s2.tableModes, [1, 0, 0, 0, 0, 0, 0, 0, 4]);
   assert.equal(state.profiles.s2.surfaceStates['Main-s2'], true);
@@ -124,7 +141,6 @@ test('migrateSystemState moves a v2 file into profiles.s2 and seeds s1 defaults'
   assert.deepEqual(state.profiles.s1.lightStates, { 'Light1-s1': true, 'Light2-s1': false, 'Light3-s1': false });
   assert.equal('lightStates' in state, false, 'no shared light state is kept');
 
-  assert.equal(state.profiles.s1.maskMode, 1);
   assert.equal(state.profiles.s1.groundThemeId, 'none');
   assert.deepEqual(state.profiles.s1.tableModes, [0, 0, 0, 0, 0, 0, 0, 0, 0]);
   assert.equal(state.profiles.s1.surfaceStates['Main-s1'], true);

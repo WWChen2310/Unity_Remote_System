@@ -97,8 +97,12 @@ function validateProfile(profileId, raw) {
     fail(`profile "${profileId}" ground must be true or false`);
   }
 
-  if (!Number.isInteger(raw.defaultMaskId) || raw.defaultMaskId < 0) {
-    fail(`profile "${profileId}" defaultMaskId must be a nonnegative integer`);
+  // 2026-10 起遮罩跟著方案走，不再由控制台切換；舊的 defaultMaskId 不再讀，避免兩版靜默用同一張遮罩。
+  if (raw.defaultMaskId !== undefined && raw.maskId === undefined) {
+    fail(`profile "${profileId}" defaultMaskId was replaced by maskId (the tracker mask this profile uses)`);
+  }
+  if (!Number.isInteger(raw.maskId) || raw.maskId < 1) {
+    fail(`profile "${profileId}" maskId must be a positive integer (1 = the tracker's first mask)`);
   }
 
   if (typeof raw.readyTimeoutSec !== 'number' || !(raw.readyTimeoutSec > 0)) {
@@ -122,7 +126,7 @@ function validateProfile(profileId, raw) {
     resetSeatsOnModes: Object.freeze(readContentModeList(raw.resetSeatsOnModes, 'resetSeatsOnModes', profileId)),
     ground: raw.ground,
     modeLabels: Object.freeze(readStringMap(raw.modeLabels, 'modeLabels', profileId)),
-    defaultMaskId: raw.defaultMaskId,
+    maskId: raw.maskId,
     readyTimeoutMs: Math.round(raw.readyTimeoutSec * 1000),
     settleMs: Math.round(raw.settleSec * 1000),
   });
@@ -210,7 +214,6 @@ function normalizeProfileTableModes(value, profile) {
 function createDefaultProfileState(profile, madmapperProfile) {
   return {
     contentMode: DEFAULT_CONTENT_MODE,
-    maskMode: profile.defaultMaskId,
     groundThemeId: 'none',
     tableModes: new Array(SEAT_COUNT).fill(0),
     surfaceStates: Object.fromEntries(
@@ -235,9 +238,6 @@ function normalizeProfileState(raw, profile, madmapperProfile, legacyLights = {}
       && source.contentMode <= MAX_CONTENT_MODE
       ? source.contentMode
       : defaults.contentMode,
-    maskMode: Number.isInteger(source.maskMode) && source.maskMode >= 0
-      ? source.maskMode
-      : defaults.maskMode,
     groundThemeId: profile.ground ? normalizeGroundThemeId(source.groundThemeId) : 'none',
     tableModes: normalizeProfileTableModes(source.tableModes, profile),
     surfaceStates: Object.fromEntries(
@@ -419,10 +419,11 @@ function createConsoleState(state, { profiles, madmapper, agentConnected = false
     agent: { connected: agentConnected },
     rooms: rooms.map(({ build, role }) => ({ build, role })),
     contentMode: active.contentMode,
-    maskMode: active.maskMode,
+    // 追蹤端用這個欄位選遮罩；遮罩固定跟著方案，不存在狀態檔。
+    maskMode: profiles.byId[state.activeProfile].maskId,
     groundThemeId: active.groundThemeId,
     tableModes: [...active.tableModes],
-    // MadMapper 與目前方案脫鉤：控制台看得到也能操作每個方案的區域（名稱不重複，可直接合併）。
+    // 控制台顯示每個方案的區域（非目前方案的鎖住，MadMapper 上是關的）；名稱不重複，可直接合併。
     surfaceStates: Object.assign(
       {},
       ...Object.values(state.profiles).flatMap((profile) => [profile.surfaceStates, profile.lightStates]),
@@ -438,7 +439,7 @@ function createRoomState(state, profile) {
   const profileState = state.profiles[profile.id];
   const room = {
     contentMode: profileState.contentMode,
-    maskMode: profileState.maskMode,
+    maskMode: profile.maskId,
     tableModes: toUnityTableModes(profile, profileState.tableModes),
     // 圖本身另外用 logoImage 送，這裡只有設定與 imageId。
     logo: { ...state.logo },
