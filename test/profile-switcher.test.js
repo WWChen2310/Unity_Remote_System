@@ -95,24 +95,22 @@ test('the blackout turns off every area of every profile and leaves the work lig
 
   const activateIndex = log.findIndex(({ kind }) => kind === 'agent-activate');
   const blackout = log.slice(0, activateIndex).filter(({ kind }) => kind === 'osc');
-  assert.equal(blackout.length, 15 + 6);
+  assert.equal(blackout.length, 6 + 6);
   assert.ok(blackout.every(({ value }) => value === 0));
   assert.equal(blackout.some(({ address }) => address.includes('Light')), false);
 });
 
 test('the restore sends the target profile state and nothing else', async () => {
   const { switcher, log, getState } = createHarness();
-  getState().profiles.s1.surfaceStates['Main-2'] = true;
-  getState().profiles.s1.surfaceStates['T7-1'] = false;
+  getState().profiles.s1.surfaceStates['T5-s1'] = false;
 
   await switcher.switchTo('s1');
 
   const delayIndex = log.findIndex(({ kind }) => kind === 'delay');
   const restore = log.slice(delayIndex).filter(({ kind }) => kind === 'osc');
-  assert.equal(restore.length, 15);
-  assert.equal(restore.find(({ address }) => address === '/surfaces/Main-1/opacity').value, 1);
-  assert.equal(restore.find(({ address }) => address === '/surfaces/Main-2/opacity').value, 1);
-  assert.equal(restore.find(({ address }) => address === '/surfaces/T7-1/opacity').value, 0);
+  assert.equal(restore.length, 6);
+  assert.equal(restore.find(({ address }) => address === '/surfaces/Main-s1/opacity').value, 1);
+  assert.equal(restore.find(({ address }) => address === '/surfaces/T5-s1/opacity').value, 0);
 });
 
 // 新的 Unity 一連上就會收到狀態，那一刻必須已經是目標方案的 view。
@@ -248,8 +246,8 @@ test('ensureActive only restores opacity when nothing had to start', async () =>
   assert.deepEqual(kinds(log), ['agent-ensure', 'osc']);
   const osc = log.filter(({ kind }) => kind === 'osc');
   // 其他方案的區域一律關掉，目前方案依狀態恢復；重開機後 MadMapper 可能留著舊的開關。
-  assert.equal(osc.length, 15 + 6);
-  assert.equal(osc.find(({ address }) => address === '/surfaces/Main-1/opacity').value, 0);
+  assert.equal(osc.length, 6 + 6);
+  assert.equal(osc.find(({ address }) => address === '/surfaces/Main-s1/opacity').value, 0);
 });
 
 test('ensureActive waits for rooms when the agent started processes', async () => {

@@ -115,16 +115,17 @@ test('migrateSystemState moves a v2 file into profiles.s2 and seeds s1 defaults'
   assert.equal(state.profiles.s2.maskMode, 2);
   assert.equal(state.profiles.s2.groundThemeId, 'crops');
   assert.deepEqual(state.profiles.s2.tableModes, [1, 0, 0, 0, 0, 0, 0, 0, 4]);
-  assert.equal(state.profiles.s2.surfaceStates.Main, true);
-  assert.equal(state.profiles.s2.surfaceStates.Ground, true);
+  assert.equal(state.profiles.s2.surfaceStates['Main-s2'], true);
+  assert.equal(state.profiles.s2.surfaceStates['T1-s2'], false);
+  assert.equal(state.profiles.s2.surfaceStates['Ground-s2'], true);
   assert.equal('Light1' in state.profiles.s2.surfaceStates, false);
   assert.deepEqual(state.lightStates, { Light1: true, Light2: false, Light3: false });
 
   assert.equal(state.profiles.s1.maskMode, 1);
   assert.equal(state.profiles.s1.groundThemeId, 'none');
   assert.deepEqual(state.profiles.s1.tableModes, [0, 0, 0, 0, 0, 0, 0, 0, 0]);
-  assert.equal(state.profiles.s1.surfaceStates['Main-1'], true);
-  assert.equal(state.profiles.s1.surfaceStates['Main-2'], false);
+  assert.equal(state.profiles.s1.surfaceStates['Main-s1'], true);
+  assert.equal(state.profiles.s1.surfaceStates['T5-s1'], true);
 
   // 自動循環載入時一律停用，與原本伺服器的行為相同。
   assert.equal(state.autoCycle.enabled, false);
@@ -145,7 +146,7 @@ test('migrateSystemState keeps a v3 file as it is', () => {
   first.activeProfile = 's1';
   first.profiles.s1.contentMode = 8;
   first.profiles.s1.tableModes[2] = 3;
-  first.profiles.s1.surfaceStates['Main-2'] = true;
+  first.profiles.s1.surfaceStates['T5-s1'] = false;
 
   const again = migrateSystemState(JSON.parse(JSON.stringify(first)), ctx);
 
@@ -195,12 +196,40 @@ test('an unknown persisted activeProfile falls back to defaultProfile', () => {
 test('surface keys that no longer exist are dropped and new ones get their default', () => {
   const state = migrateSystemState({
     version: 3,
-    profiles: { s1: { surfaceStates: { 'Main-1': false, 'Old-9': true } } },
+    profiles: { s1: { surfaceStates: { 'Main-s1': false, 'Old-9': true } } },
   }, context());
 
-  assert.equal(state.profiles.s1.surfaceStates['Main-1'], false);
-  assert.equal(state.profiles.s1.surfaceStates['T1-1'], true);
+  assert.equal(state.profiles.s1.surfaceStates['Main-s1'], false);
+  assert.equal(state.profiles.s1.surfaceStates['T1-s1'], true);
   assert.equal('Old-9' in state.profiles.s1.surfaceStates, false);
+});
+
+// 2026-10 以前的狀態檔用短名稱（Main、T1…）當 key。改成 MadMapper 的 -s2 名稱後，
+// 現場已保存的開關要沿用，否則更新完第二版的區域會全部變回預設（關閉）。
+test('a saved state keyed by the old short names keeps its switches under the new names', () => {
+  const state = migrateSystemState({
+    version: 3,
+    profiles: {
+      s1: { surfaceStates: { 'Main-1': false, 'T7-1': true } },
+      s2: { surfaceStates: { Main: true, T1: false, T2: true, T3: true, T4: false, Ground: true } },
+    },
+  }, context());
+
+  assert.deepEqual(state.profiles.s2.surfaceStates, {
+    'Main-s2': true, 'T1-s2': false, 'T2-s2': true, 'T3-s2': true, 'T4-s2': false, 'Ground-s2': true,
+  });
+  // 第一版的舊名稱（Main-1…）與新的短名稱不同，無從對應，回到預設的開啟。
+  assert.ok(Object.values(state.profiles.s1.surfaceStates).every((value) => value === true));
+  assert.deepEqual(Object.keys(state.profiles.s1.surfaceStates), ['Main-s1', 'T1-s1', 'T2-s1', 'T3-s1', 'T4-s1', 'T5-s1']);
+});
+
+test('the new name wins over the old short name when a state has both', () => {
+  const state = migrateSystemState({
+    version: 3,
+    profiles: { s2: { surfaceStates: { Main: true, 'Main-s2': false } } },
+  }, context());
+
+  assert.equal(state.profiles.s2.surfaceStates['Main-s2'], false);
 });
 
 // ---- views ------------------------------------------------------------------
@@ -263,16 +292,16 @@ test('createConsoleState exposes only the active areas plus the work lights', ()
   const view = createConsoleState(state, { ...ctx, agentConnected: true, rooms: [{ build: 's1', role: 'both' }] });
 
   assert.equal(view.activeProfile, 's1');
-  assert.ok('Main-1' in view.surfaceStates);
+  assert.ok('Main-s1' in view.surfaceStates);
   assert.ok('Light1' in view.surfaceStates);
-  assert.equal('Main' in view.surfaceStates, false);
+  assert.equal('Main-s2' in view.surfaceStates, false);
   assert.equal(view.tableModes.length, 9);
   assert.equal(view.groundThemeId, 'none');
   assert.deepEqual(view.agent, { connected: true });
   assert.deepEqual(view.rooms, [{ build: 's1', role: 'both' }]);
   assert.equal(view.switch.status, 'idle');
   assert.deepEqual(view.profileCatalog.map(({ id }) => id), ['s1', 's2']);
-  assert.deepEqual(view.profileCatalog[0].areas[0], { name: 'Main-1', group: '模式一' });
+  assert.deepEqual(view.profileCatalog[0].areas[0], { name: 'Main-s1', label: 'Main', group: null });
   assert.equal(view.profileCatalog[0].seatCount, 8);
   assert.deepEqual(view.profileCatalog[0].seatModeLabels, { 0: '預設' });
   assert.equal(view.profileCatalog[1].ground, true);
@@ -283,10 +312,10 @@ test('createConsoleState does not leak mutable references into the persisted sta
   const view = createConsoleState(ctx.state, ctx);
 
   view.tableModes[0] = 3;
-  view.surfaceStates.Main = true;
+  view.surfaceStates['Main-s2'] = true;
 
   assert.equal(ctx.state.profiles.s2.tableModes[0], 0);
-  assert.equal(ctx.state.profiles.s2.surfaceStates.Main, false);
+  assert.equal(ctx.state.profiles.s2.surfaceStates['Main-s2'], false);
 });
 
 test('viewKindForClient routes rooms by build and everyone else to the console view', () => {

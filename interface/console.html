@@ -871,7 +871,8 @@
             return profile ? profile.areas.map(area => area.name) : [];
         }
 
-        // s1 的區域分「模式一／模式二」兩組，沒有分組的方案全部放同一個格子。
+        // 區域可用 group 分組顯示；沒有分組的方案（目前兩版都是）全部放同一個格子。
+        // 按鈕顯示 label（Main、T1…），送給伺服器的是 name（MadMapper 的 surface 名稱，例如 Main-s1）。
         function renderAreaGroups(profile) {
             const container = document.getElementById('areaControlGroups');
             container.innerHTML = '';
@@ -897,7 +898,7 @@
                 }
                 const grid = document.createElement('div');
                 grid.className = 'surface-grid';
-                fillSurfaceGrid(grid, group.areas.map(area => ({ SurfaceName: area.name, ShowName: area.name })));
+                fillSurfaceGrid(grid, group.areas.map(area => ({ SurfaceName: area.name, ShowName: area.label || area.name })));
                 wrapper.appendChild(grid);
                 container.appendChild(wrapper);
             });

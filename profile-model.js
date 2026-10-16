@@ -236,12 +236,20 @@ function normalizeProfileState(raw, profile, madmapperProfile) {
     groundThemeId: profile.ground ? normalizeGroundThemeId(source.groundThemeId) : 'none',
     tableModes: normalizeProfileTableModes(source.tableModes, profile),
     surfaceStates: Object.fromEntries(
-      madmapperProfile.areas.map(({ name, defaultOn }) => [
-        name,
-        Object.prototype.hasOwnProperty.call(surfaces, name) ? surfaces[name] === true : defaultOn,
-      ]),
+      madmapperProfile.areas.map((area) => [area.name, readSurfaceState(surfaces, area)]),
     ),
   };
+}
+
+/**
+ * 2026-10 以前狀態檔用短名稱（Main、T1…）當 key，之後改用 MadMapper 的名稱（Main-s2…）。
+ * 新名稱找不到時沿用與 label 同名的舊 key，現場更新後已保存的開關不會變回預設。
+ */
+function readSurfaceState(surfaces, { name, label, defaultOn }) {
+  const has = (key) => Object.prototype.hasOwnProperty.call(surfaces, key);
+  if (has(name)) return surfaces[name] === true;
+  if (has(label)) return surfaces[label] === true;
+  return defaultOn;
 }
 
 function normalizeSwitchState(raw) {
@@ -374,7 +382,7 @@ function createProfileCatalog(profiles, madmapper) {
       seatLockedInModes: [...profile.seatLockedInModes],
       ground: profile.ground,
       modeLabels: { ...profile.modeLabels },
-      areas: madmapper.profiles[profileId].areas.map(({ name, group }) => ({ name, group })),
+      areas: madmapper.profiles[profileId].areas.map(({ name, label, group }) => ({ name, label, group })),
     };
   });
 }

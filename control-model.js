@@ -107,13 +107,18 @@ function validateMadmapperConfig(config) {
       if (area.group !== undefined && area.group !== null && typeof area.group !== 'string') {
         throw new TypeError(`MadMapper area "${name}" group must be a string`);
       }
+      if (area.label !== undefined && (typeof area.label !== 'string' || area.label === '')) {
+        throw new TypeError(`MadMapper area "${name}" label must be a nonempty string`);
+      }
       if (area.defaultOn !== undefined && typeof area.defaultOn !== 'boolean') {
         throw new TypeError(`MadMapper area "${name}" defaultOn must be true or false`);
       }
 
       usedNames.add(name);
+      // name 是 MadMapper 的 surface 名稱，也是狀態檔與控制台指令用的 key；label 只用來顯示。
       const normalizedArea = {
         name,
+        label: area.label === undefined ? name : area.label,
         oscAddress,
         group: typeof area.group === 'string' ? area.group : null,
         defaultOn: area.defaultOn === true,

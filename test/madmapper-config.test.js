@@ -5,45 +5,42 @@ const assert = require('node:assert/strict');
 
 const { validateMadmapperConfig } = require('../control-model');
 
-const S1_AREA_NAMES = [
-  'Main-1', 'T1-1', 'T2-1', 'T3-1', 'T4-1', 'T5-1', 'T6-1', 'T7-1',
-  'Main-2', 'T2-2', 'T3-2', 'T4-2', 'T5-2', 'T6-2', 'T7-2',
-];
+// 現場 MadMapper 的 surface 名稱以「-s1」「-s2」區分版本（2026-10 起）。
+// name 必須與 MadMapper 完全一致，否則按了沒反應而且沒有錯誤；label 是控制台上顯示的短名稱。
+const expectedAreas = (suffix, labels) => labels.map((label) => ({
+  name: `${label}-${suffix}`,
+  label,
+  oscAddress: `/surfaces/${label}-${suffix}/opacity`,
+}));
 
-test('MadMapper config keeps the six s2 surfaces at their existing addresses', () => {
-  const validated = validateMadmapperConfig(require('../madmapper.config.json'));
-
-  assert.deepEqual(
-    validated.profiles.s2.areas.map(({ name, oscAddress }) => ({ name, oscAddress })),
-    [
-      { name: 'Main', oscAddress: '/surfaces/Main/opacity' },
-      { name: 'T1', oscAddress: '/surfaces/T1/opacity' },
-      { name: 'T2', oscAddress: '/surfaces/T2/opacity' },
-      { name: 'T3', oscAddress: '/surfaces/T3/opacity' },
-      { name: 'T4', oscAddress: '/surfaces/T4/opacity' },
-      { name: 'Ground', oscAddress: '/surfaces/Ground/opacity' },
-    ],
-  );
-});
-
-// s1 的 15 個名稱來自 2026-03 版的 Node（SURFACES_SETTINGS），MadMapper 的 s1 拼接檔用的就是這組。
-// 合併後的 MadMapper 專案必須用完全相同的名稱，否則按了沒反應而且沒有錯誤。
-test('MadMapper config restores the fifteen s1 surfaces in two groups', () => {
+test('s1 has the six table surfaces Main and T1–T5, all on by default, ungrouped', () => {
   const validated = validateMadmapperConfig(require('../madmapper.config.json'));
   const { areas } = validated.profiles.s1;
 
-  assert.deepEqual(areas.map(({ name }) => name), S1_AREA_NAMES);
-  for (const { name, oscAddress } of areas) {
-    assert.equal(oscAddress, `/surfaces/${name}/opacity`);
-  }
   assert.deepEqual(
-    areas.filter(({ defaultOn }) => defaultOn).map(({ name }) => name),
-    S1_AREA_NAMES.filter((name) => name.endsWith('-1')),
+    areas.map(({ name, label, oscAddress }) => ({ name, label, oscAddress })),
+    expectedAreas('s1', ['Main', 'T1', 'T2', 'T3', 'T4', 'T5']),
   );
+  assert.ok(areas.every(({ defaultOn }) => defaultOn));
+  assert.ok(areas.every(({ group }) => group === null));
+});
+
+test('s2 keeps its six surfaces under the -s2 MadMapper names', () => {
+  const validated = validateMadmapperConfig(require('../madmapper.config.json'));
+
   assert.deepEqual(
-    [...new Set(areas.map(({ group }) => group))],
-    ['模式一', '模式二'],
+    validated.profiles.s2.areas.map(({ name, label, oscAddress }) => ({ name, label, oscAddress })),
+    expectedAreas('s2', ['Main', 'T1', 'T2', 'T3', 'T4', 'Ground']),
   );
+});
+
+test('an area without a label shows its name', () => {
+  const config = JSON.parse(JSON.stringify(require('../madmapper.config.json')));
+  delete config.profiles.s1.areas[0].label;
+  assert.equal(validateMadmapperConfig(config).profiles.s1.areas[0].label, 'Main-s1');
+
+  config.profiles.s1.areas[0].label = 3;
+  assert.throws(() => validateMadmapperConfig(config), /label must be a nonempty string/);
 });
 
 // 介面的燈名與 config 的燈名若不一致，按鈕會送出伺服器不認得的名字，

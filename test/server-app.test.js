@@ -157,7 +157,7 @@ test('switching to s1 gives the s1 room eight reversed seats and restores s1 are
   const firstOn = site.oscLog.findIndex(({ args }) => args[0].value === 1);
   assert.ok(firstOn > 0);
   assert.ok(site.oscLog.slice(0, firstOn).every(({ args }) => args[0].value === 0), 'blackout comes first');
-  assert.ok(site.oscLog.some(({ address, args }) => address === '/surfaces/Main-1/opacity' && args[0].value === 1));
+  assert.ok(site.oscLog.some(({ address, args }) => address === '/surfaces/Main-s1/opacity' && args[0].value === 1));
   assert.equal(site.server.getState().profiles.s2.tableModes[0], 1, 's2 keeps its own seats');
 });
 
@@ -231,7 +231,7 @@ test('commands other than work lights are rejected while switching', async (t) =
     { type: 'updateTableMode', tableIndex: 0, mode: 1 },
     { type: 'switchGroundTheme', groundThemeId: 'crops' },
     { type: 'maskControl', maskId: 2 },
-    { type: 'madmapperControl', surface: 'Main-1', enabled: true },
+    { type: 'madmapperControl', surface: 'Main-s1', enabled: true },
     { type: 'switchProfile', profileId: 's2' },
     { type: 'restartProfile' },
   ]) {
@@ -253,13 +253,13 @@ test('area toggles only reach areas of the active profile', async (t) => {
   const consoleClient = await site.connectConsole();
   site.oscLog.length = 0;
 
-  consoleClient.send({ type: 'madmapperControl', surface: 'Main-1', enabled: true });
+  consoleClient.send({ type: 'madmapperControl', surface: 'Main-s1', enabled: true });
   assert.equal((await consoleClient.waitFor((m) => m.type === 'commandRejected')).reason, 'notInProfile');
 
-  consoleClient.send({ type: 'madmapperControl', surface: 'T3', enabled: true });
+  consoleClient.send({ type: 'madmapperControl', surface: 'T3-s2', enabled: true });
   await waitUntil(() => site.oscLog.length === 1);
-  assert.equal(site.oscLog[0].address, '/surfaces/T3/opacity');
-  assert.equal(site.server.getState().profiles.s2.surfaceStates.T3, true);
+  assert.equal(site.oscLog[0].address, '/surfaces/T3-s2/opacity');
+  assert.equal(site.server.getState().profiles.s2.surfaceStates['T3-s2'], true);
 });
 
 test('the tracker receives the maskMode of the new profile', async (t) => {
@@ -370,6 +370,7 @@ test('a legacy state file is migrated and saved as v3 on start', async (t) => {
   assert.equal(saved.version, 3);
   assert.equal(saved.profiles.s2.contentMode, 5);
   assert.deepEqual(saved.profiles.s2.tableModes, [1, 0, 0, 0, 0, 0, 0, 0, 0]);
+  assert.equal(saved.profiles.s2.surfaceStates['Main-s2'], true, 'the old short key carries over');
   assert.ok(saved.timestamp);
 });
 

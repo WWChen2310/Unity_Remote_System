@@ -5,31 +5,22 @@
   "profiles": {
     "s1": {
       "areas": [
-        { "name": "Main-1", "group": "模式一", "oscAddress": "/surfaces/Main-1/opacity", "defaultOn": true },
-        { "name": "T1-1", "group": "模式一", "oscAddress": "/surfaces/T1-1/opacity", "defaultOn": true },
-        { "name": "T2-1", "group": "模式一", "oscAddress": "/surfaces/T2-1/opacity", "defaultOn": true },
-        { "name": "T3-1", "group": "模式一", "oscAddress": "/surfaces/T3-1/opacity", "defaultOn": true },
-        { "name": "T4-1", "group": "模式一", "oscAddress": "/surfaces/T4-1/opacity", "defaultOn": true },
-        { "name": "T5-1", "group": "模式一", "oscAddress": "/surfaces/T5-1/opacity", "defaultOn": true },
-        { "name": "T6-1", "group": "模式一", "oscAddress": "/surfaces/T6-1/opacity", "defaultOn": true },
-        { "name": "T7-1", "group": "模式一", "oscAddress": "/surfaces/T7-1/opacity", "defaultOn": true },
-        { "name": "Main-2", "group": "模式二", "oscAddress": "/surfaces/Main-2/opacity" },
-        { "name": "T2-2", "group": "模式二", "oscAddress": "/surfaces/T2-2/opacity" },
-        { "name": "T3-2", "group": "模式二", "oscAddress": "/surfaces/T3-2/opacity" },
-        { "name": "T4-2", "group": "模式二", "oscAddress": "/surfaces/T4-2/opacity" },
-        { "name": "T5-2", "group": "模式二", "oscAddress": "/surfaces/T5-2/opacity" },
-        { "name": "T6-2", "group": "模式二", "oscAddress": "/surfaces/T6-2/opacity" },
-        { "name": "T7-2", "group": "模式二", "oscAddress": "/surfaces/T7-2/opacity" }
+        { "name": "Main-s1", "label": "Main", "oscAddress": "/surfaces/Main-s1/opacity", "defaultOn": true },
+        { "name": "T1-s1", "label": "T1", "oscAddress": "/surfaces/T1-s1/opacity", "defaultOn": true },
+        { "name": "T2-s1", "label": "T2", "oscAddress": "/surfaces/T2-s1/opacity", "defaultOn": true },
+        { "name": "T3-s1", "label": "T3", "oscAddress": "/surfaces/T3-s1/opacity", "defaultOn": true },
+        { "name": "T4-s1", "label": "T4", "oscAddress": "/surfaces/T4-s1/opacity", "defaultOn": true },
+        { "name": "T5-s1", "label": "T5", "oscAddress": "/surfaces/T5-s1/opacity", "defaultOn": true }
       ]
     },
     "s2": {
       "areas": [
-        { "name": "Main", "oscAddress": "/surfaces/Main/opacity" },
-        { "name": "T1", "oscAddress": "/surfaces/T1/opacity" },
-        { "name": "T2", "oscAddress": "/surfaces/T2/opacity" },
-        { "name": "T3", "oscAddress": "/surfaces/T3/opacity" },
-        { "name": "T4", "oscAddress": "/surfaces/T4/opacity" },
-        { "name": "Ground", "oscAddress": "/surfaces/Ground/opacity" }
+        { "name": "Main-s2", "label": "Main", "oscAddress": "/surfaces/Main-s2/opacity" },
+        { "name": "T1-s2", "label": "T1", "oscAddress": "/surfaces/T1-s2/opacity" },
+        { "name": "T2-s2", "label": "T2", "oscAddress": "/surfaces/T2-s2/opacity" },
+        { "name": "T3-s2", "label": "T3", "oscAddress": "/surfaces/T3-s2/opacity" },
+        { "name": "T4-s2", "label": "T4", "oscAddress": "/surfaces/T4-s2/opacity" },
+        { "name": "Ground-s2", "label": "Ground", "oscAddress": "/surfaces/Ground-s2/opacity" }
       ]
     }
   },

@@ -5,9 +5,11 @@
 - 執行環境需為 `Node.js >= 18.1`。在本專案根目錄先執行 `npm ci`；沒有 lockfile 的情況才改用 `npm install`。
 - `madmapper.config.json` 是 MadMapper OSC 的唯一部署設定來源。請在 Node JSON 內修改 `ip`、`port`、`localPort`，以及每個區域完整的 `oscAddress`；OSC Address 不在 Unity Inspector 編輯。
 - 區域依投影方案分組，寫在 `profiles.<id>.areas`；工作燈寫在全域的 `lights`。舊格式（頂層 `areas`）會讓伺服器拒絕啟動，請改成新格式。
-- 第二版（2026-07，內部代號 s2）的六個固定名稱依序為 `Main`、`T1`、`T2`、`T3`、`T4`、`Ground`。預設位址分別是 `/surfaces/Main/opacity`、`/surfaces/T1/opacity`、`/surfaces/T2/opacity`、`/surfaces/T3/opacity`、`/surfaces/T4/opacity`、`/surfaces/Ground/opacity`。完整 `oscAddress` 字串皆可依 MadMapper 實際命名修改。
+- 每個區域有三個欄位：`name` 是 MadMapper 的 surface 名稱（也是狀態檔與控制台指令的 key），`label` 是控制台按鈕上顯示的短名稱，`oscAddress` 是送出的位址。MadMapper 以 `-s1`、`-s2` 結尾區分版本（2026-10 起）。
+- 第二版（2026-07，內部代號 s2）的六個區域依序為 `Main-s2`、`T1-s2`、`T2-s2`、`T3-s2`、`T4-s2`、`Ground-s2`（控制台顯示 `Main`、`T1`、`T2`、`T3`、`T4`、`Ground`）。預設位址分別是 `/surfaces/Main-s2/opacity`、`/surfaces/T1-s2/opacity`、`/surfaces/T2-s2/opacity`、`/surfaces/T3-s2/opacity`、`/surfaces/T4-s2/opacity`、`/surfaces/Ground-s2/opacity`。完整 `oscAddress` 字串皆可依 MadMapper 實際命名修改。
+- 舊狀態檔（2026-10 以前）用短名稱 `Main`、`T1`… 當 key；Node 讀到時會沿用到對應的新名稱，第二版已保存的開關不會遺失。第一版舊的 `Main-1`… 無法對應，回到預設的開啟。
 - 首次啟動可執行 `npm start`（等同 `node integrated-server.js`）。修改 JSON 後必須重啟 Node：使用 PM2 時執行 `pm2 restart <應用程式名稱>`；直接啟動時先停止舊程序，再重新執行啟動指令。
-- 第一版（2026-03，內部代號 s1）沿用當時的 15 個 surface：`Main-1`、`T1-1`～`T7-1`（模式一，預設開）與 `Main-2`、`T2-2`～`T7-2`（模式二，預設關），位址為 `/surfaces/<名稱>/opacity`。
+- 第一版（2026-03，內部代號 s1）的桌面有六個區域：`Main-s1`、`T1-s1`～`T5-s1`（控制台顯示 `Main`、`T1`～`T5`，預設開啟，不分組），位址為 `/surfaces/<名稱>/opacity`。
 - Node.js 負責傳送 OSC 給 MadMapper；Unity 不會傳送 OSC，也不需要安裝 Unity OSC 套件。
 
 ## Unity 九座位設定（第二版）
@@ -32,7 +34,7 @@ Web 伺服器必須同時部署 `interface/console.html` 與 `interface/control-
 
 控制台以 iPad 為主要操作裝置，分為「內容播放、座位控制、投影與燈光、Logo 疊圖、循環與資訊」五個標籤頁。每頁卡片依序排列，避免不同高度的卡片造成大片留白；座位面板在平板每列兩席，手機每列一席。支援直向、橫向與頁面縮放，主要按鈕至少 44px 高。上方持續顯示目前狀態與版本選擇，版本規則可展開查看。標籤切換只改變顯示頁面，不改變播放或方案；開啟頁面時沿用伺服器目前方案。
 
-- 第一版（s1）：8 席，只有「分割內容」可操作座位，狀態為預設／海洋／森林／液態食物；不顯示獨立地面控制，投影區域依模式一／模式二分組。
+- 第一版（s1）：8 席，只有「分割內容」可操作座位，狀態為預設／海洋／森林／液態食物；不顯示獨立地面控制，投影區域為 Main、T1～T5 六個。
 - 第二版（s2）：9 席，座位增加關燈／開燈，稻田／水草背景下停用座位效果；地面內容可獨立切換。
 - 各版本分別保存背景、座位、遮罩與投影區域；工作燈與 Logo 共用，切換期間仍可操作。
 
@@ -40,8 +42,8 @@ Web 伺服器必須同時部署 `interface/console.html` 與 `interface/control-
 
 | 方案 | 內容 | Unity | MadMapper surface |
 |---|---|---|---|
-| 第一版（s1） | 2026-03 版（`release/s1`，`dadf77a`） | `C:\Room\S1\RoomS1.exe`，單一實例 | 15 個 `*-1`／`*-2` |
-| 第二版（s2） | 2026-07 版（`main`） | `C:\Room\S2\RoomS2.exe`，tables 與 ground 兩個實例 | 六區 |
+| 第一版（s1） | 2026-03 版（`release/s1`，`dadf77a`） | `C:\Room\S1\RoomS1.exe`，單一實例 | 6 個 `*-s1` |
+| 第二版（s2） | 2026-07 版（`main`） | `C:\Room\S2\RoomS2.exe`，tables 與 ground 兩個實例 | 6 個 `*-s2` |
 
 可執行檔名稱分別是 `RoomS1.exe` 與 `RoomS2.exe`。
 

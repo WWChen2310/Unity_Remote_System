@@ -26,21 +26,12 @@
         0
       ],
       "surfaceStates": {
-        "Main-1": true,
-        "T1-1": true,
-        "T2-1": true,
-        "T3-1": true,
-        "T4-1": true,
-        "T5-1": true,
-        "T6-1": true,
-        "T7-1": true,
-        "Main-2": false,
-        "T2-2": false,
-        "T3-2": false,
-        "T4-2": false,
-        "T5-2": false,
-        "T6-2": false,
-        "T7-2": false
+        "Main-s1": true,
+        "T1-s1": true,
+        "T2-s1": true,
+        "T3-s1": true,
+        "T4-s1": true,
+        "T5-s1": true
       }
     },
     "s2": {
@@ -59,12 +50,12 @@
         0
       ],
       "surfaceStates": {
-        "Main": false,
-        "T1": false,
-        "T2": false,
-        "T3": false,
-        "T4": false,
-        "Ground": false
+        "Main-s2": false,
+        "T1-s2": false,
+        "T2-s2": false,
+        "T3-s2": false,
+        "T4-s2": false,
+        "Ground-s2": false
       }
     }
   },
@@ -85,5 +76,14 @@
     "currentIndex": 0,
     "remainingSeconds": 0
   },
-  "timestamp": "2026-02-13T09:34:54.595Z"
+  "logo": {
+    "enabled": false,
+    "imageId": null,
+    "mime": null,
+    "target": "tables",
+    "scale": 0.2,
+    "rotation": 0,
+    "x": 0.5,
+    "y": 0.5
+  }
 }
