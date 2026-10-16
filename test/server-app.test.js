@@ -117,6 +117,12 @@ async function waitUntil(predicate, timeoutMs = 3000) {
   }
 }
 
+// 切換的第一步送完整狀態（控制台要依新方案重畫），之後的步驟只送 profileSwitchUpdate。
+function isSwitchingAt(step) {
+  return (m) => (m.type === 'systemStateUpdate' && m.state.switch.step === step)
+    || (m.type === 'profileSwitchUpdate' && m.switch.step === step);
+}
+
 function isIdleOn(profileId) {
   return (m) => m.type === 'systemStateUpdate'
     && m.state.activeProfile === profileId
@@ -136,7 +142,7 @@ test('the agent connecting starts the active profile and its rooms get room view
   assert.deepEqual(Object.keys(roomState.state).sort(), ['contentMode', 'groundThemeId', 'logo', 'maskMode', 'tableModes']);
 });
 
-test('switching to s1 gives the s1 room eight reversed seats and restores s1 areas', async (t) => {
+test('switching to s1 gives the s1 room eight reversed seats and leaves MadMapper alone', async (t) => {
   const site = await startAndSettle(t);
   const consoleClient = await site.connectConsole();
 
@@ -154,10 +160,7 @@ test('switching to s1 gives the s1 room eight reversed seats and restores s1 are
   assert.deepEqual(roomState.state.tableModes, [0, 0, 0, 0, 0, 0, 0, 0]);
   assert.equal('groundThemeId' in roomState.state, false);
 
-  const firstOn = site.oscLog.findIndex(({ args }) => args[0].value === 1);
-  assert.ok(firstOn > 0);
-  assert.ok(site.oscLog.slice(0, firstOn).every(({ args }) => args[0].value === 0), 'blackout comes first');
-  assert.ok(site.oscLog.some(({ address, args }) => address === '/surfaces/Main-s1/opacity' && args[0].value === 1));
+  assert.deepEqual(site.oscLog, [], 'switching sends nothing to MadMapper');
   assert.equal(site.server.getState().profiles.s2.tableModes[0], 1, 's2 keeps its own seats');
 });
 
@@ -218,20 +221,19 @@ test('entering split mode in s1 resets its seats like the 2026-03 server did', a
   assert.deepEqual(update.tableModes, [0, 0, 0, 0, 0, 0, 0, 0, 0]);
 });
 
-test('commands other than work lights are rejected while switching', async (t) => {
+test('Unity commands are rejected while switching but MadMapper stays controllable', async (t) => {
   const site = await startTestSite(t, { hangActivate: true });
   site.agent.isConnected = true;
   const consoleClient = await site.connectConsole();
 
   consoleClient.send({ type: 'switchProfile', profileId: 's1' });
-  await consoleClient.waitFor((m) => m.type === 'profileSwitchUpdate' && m.switch.step === 'starting');
+  await consoleClient.waitFor(isSwitchingAt('starting'));
 
   for (const command of [
     { type: 'switchMode', mode: 3, manual: true },
     { type: 'updateTableMode', tableIndex: 0, mode: 1 },
     { type: 'switchGroundTheme', groundThemeId: 'crops' },
     { type: 'maskControl', maskId: 2 },
-    { type: 'madmapperControl', surface: 'Main-s1', enabled: true },
     { type: 'switchProfile', profileId: 's2' },
     { type: 'restartProfile' },
   ]) {
@@ -243,23 +245,65 @@ test('commands other than work lights are rejected while switching', async (t) =
 
   site.oscLog.length = 0;
   consoleClient.send({ type: 'madmapperControl', surface: 'Light1', enabled: true });
-  await waitUntil(() => site.oscLog.length === 1);
-  assert.equal(site.oscLog[0].address, '/surfaces/Light1/opacity');
+  consoleClient.send({ type: 'madmapperControl', surface: 'Main-s1', enabled: false });
+  consoleClient.send({ type: 'madmapperControl', surface: 'Ground-s2', enabled: true });
+  await waitUntil(() => site.oscLog.length === 3);
+  assert.deepEqual(site.oscLog.map(({ address, args }) => [address, args[0].value]), [
+    ['/surfaces/Light1/opacity', 1],
+    ['/surfaces/Main-s1/opacity', 0],
+    ['/surfaces/Ground-s2/opacity', 1],
+  ]);
   assert.equal(site.server.getState().lightStates.Light1, true);
+  assert.equal(site.server.getState().profiles.s1.surfaceStates['Main-s1'], false);
+  assert.equal(site.server.getState().profiles.s2.surfaceStates['Ground-s2'], true);
 });
 
-test('area toggles only reach areas of the active profile', async (t) => {
+test('areas of either profile can be toggled whichever profile is active', async (t) => {
   const site = await startAndSettle(t);
   const consoleClient = await site.connectConsole();
+  const other = await site.connectConsole();
   site.oscLog.length = 0;
 
-  consoleClient.send({ type: 'madmapperControl', surface: 'Main-s1', enabled: true });
-  assert.equal((await consoleClient.waitFor((m) => m.type === 'commandRejected')).reason, 'notInProfile');
-
+  consoleClient.send({ type: 'madmapperControl', surface: 'T3-s1', enabled: false });
   consoleClient.send({ type: 'madmapperControl', surface: 'T3-s2', enabled: true });
-  await waitUntil(() => site.oscLog.length === 1);
-  assert.equal(site.oscLog[0].address, '/surfaces/T3-s2/opacity');
+  await waitUntil(() => site.oscLog.length === 2);
+  assert.deepEqual(site.oscLog.map(({ address }) => address), ['/surfaces/T3-s1/opacity', '/surfaces/T3-s2/opacity']);
+  assert.equal(site.server.getState().profiles.s1.surfaceStates['T3-s1'], false);
   assert.equal(site.server.getState().profiles.s2.surfaceStates['T3-s2'], true);
+  const update = await other.waitFor((m) => m.type === 'madmapperStatusUpdate' && m.surface === 'T3-s1');
+  assert.equal(update.enabled, false);
+
+  consoleClient.send({ type: 'madmapperControl', surface: 'Nope', enabled: true });
+  assert.equal((await consoleClient.waitFor((m) => m.type === 'commandRejected')).reason, 'unknownSurface');
+});
+
+test('the console sees the switches of both profiles and the lights', async (t) => {
+  const site = await startTestSite(t);
+  const consoleClient = await site.connectConsole();
+
+  const { state } = await consoleClient.waitFor((m) => m.type === 'systemStateUpdate');
+  for (const name of ['Main-s1', 'T5-s1', 'Main-s2', 'Ground-s2', 'Light1']) {
+    assert.equal(typeof state.surfaceStates[name], 'boolean', name);
+  }
+});
+
+// MadMapper 重開機後可能留著專案存檔時的開關；Node 啟動時把控制台看到的狀態同步過去一次。
+test('on start the server sends every saved area and light switch to MadMapper once', async (t) => {
+  const site = await startTestSite(t, {
+    initialState: { version: 3, activeProfile: 's2', profiles: { s1: { surfaceStates: { 'T2-s1': false } } }, lightStates: { Light2: true } },
+  });
+
+  const sent = new Map(site.oscLog.map(({ address, args }) => [address, args[0].value]));
+  assert.equal(site.oscLog.length, 6 + 6 + 3);
+  assert.equal(sent.get('/surfaces/Main-s1/opacity'), 1);
+  assert.equal(sent.get('/surfaces/T2-s1/opacity'), 0);
+  assert.equal(sent.get('/surfaces/Main-s2/opacity'), 0);
+  assert.equal(sent.get('/surfaces/Light2/opacity'), 1);
+
+  site.oscLog.length = 0;
+  site.agent.start();
+  await waitUntil(() => site.server.getRooms().length === 2);
+  assert.deepEqual(site.oscLog, [], 'the agent connecting does not touch MadMapper');
 });
 
 test('the tracker receives the maskMode of the new profile', async (t) => {
@@ -342,7 +386,7 @@ test('a restart while switching is persisted as failed', async (t) => {
   first.agent.isConnected = true;
   const consoleClient = await first.connectConsole();
   consoleClient.send({ type: 'switchProfile', profileId: 's1' });
-  await consoleClient.waitFor((m) => m.type === 'profileSwitchUpdate' && m.switch.step === 'starting');
+  await consoleClient.waitFor(isSwitchingAt('starting'));
   const saved = JSON.parse(fs.readFileSync(first.stateFile, 'utf8'));
   assert.equal(saved.switch.status, 'switching');
 

@@ -402,7 +402,8 @@ function createConsoleState(state, { profiles, madmapper, agentConnected = false
     maskMode: active.maskMode,
     groundThemeId: active.groundThemeId,
     tableModes: [...active.tableModes],
-    surfaceStates: { ...active.surfaceStates, ...state.lightStates },
+    // MadMapper 與目前方案脫鉤：控制台看得到也能操作每個方案的區域（名稱不重複，可直接合併）。
+    surfaceStates: Object.assign({}, ...Object.values(state.profiles).map((profile) => profile.surfaceStates), state.lightStates),
     autoCycle: { ...state.autoCycle, modes: [...(state.autoCycle.modes || [])] },
     logo: { ...state.logo },
     profileCatalog: createProfileCatalog(profiles, madmapper),

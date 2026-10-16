@@ -34,13 +34,12 @@ const {
 const { RoomPresence } = require('./room-presence');
 const { ProfileSwitcher } = require('./profile-switcher');
 
-// 切換中拒絕的指令。工作燈的 madmapperControl 另外放行（實體燈，與投影無關）。
+// 切換中拒絕的指令（都是 Unity 的）。MadMapper 的 madmapperControl 與切換脫鉤，隨時可用。
 const BLOCKED_WHILE_SWITCHING = new Set([
   'switchMode',
   'updateTableMode',
   'switchGroundTheme',
   'maskControl',
-  'madmapperControl',
   'switchProfile',
   'restartProfile',
 ]);
@@ -261,6 +260,37 @@ function startServer({
     }));
   }
 
+  // ---- MadMapper ----
+
+  /** 區域名稱在各方案間不重複（control-model 驗證過），所以名稱就能找到它屬於哪個方案。 */
+  function findMadmapperOwner(name) {
+    if (Object.prototype.hasOwnProperty.call(madmapper.lightMap, name)) {
+      return { states: state.lightStates, targets: madmapper.lightMap };
+    }
+    for (const [profileId, { areaMap }] of Object.entries(madmapper.profiles)) {
+      if (Object.prototype.hasOwnProperty.call(areaMap, name)) {
+        return { states: state.profiles[profileId].surfaceStates, targets: areaMap };
+      }
+    }
+    return null;
+  }
+
+  /**
+   * 啟動時把存檔裡每個區域與工作燈的開關送給 MadMapper 一次。MadMapper 重開後會留著
+   * 專案存檔時的開關，這樣才會與控制台看到的一致。之後只有操作者按了才送。
+   */
+  function syncMadmapper() {
+    for (const [profileId, { areas, areaMap }] of Object.entries(madmapper.profiles)) {
+      const states = state.profiles[profileId].surfaceStates;
+      for (const { name } of areas) {
+        sendOsc(createMadmapperOscMessage(areaMap, name, states[name] === true));
+      }
+    }
+    for (const { name } of madmapper.lights) {
+      sendOsc(createMadmapperOscMessage(madmapper.lightMap, name, state.lightStates[name] === true));
+    }
+  }
+
   // ---- 切換 ----
 
   const switcher = new ProfileSwitcher({
@@ -272,8 +302,6 @@ function startServer({
       },
     },
     profiles,
-    madmapper,
-    sendOsc,
     agent,
     presence,
     ...(delay ? { delay } : {}),
@@ -284,7 +312,7 @@ function startServer({
       // 開始與失敗時送完整狀態（控制台要依新方案重畫，追蹤端要拿到新方案的遮罩）；
       // 中間步驟只送進度，避免追蹤端每一步都重套一次遮罩。
       switchChanged: () => {
-        if (state.switch.status === 'failed' || state.switch.step === 'blackout') {
+        if (state.switch.status === 'failed' || state.switch.step === 'starting') {
           publishFullState({ consolesOnly: true });
         } else {
           publishToConsoles({ type: 'profileSwitchUpdate', activeProfile: state.activeProfile, switch: { ...state.switch } });
@@ -398,28 +426,18 @@ function startServer({
       publish(() => ({ type: 'groundThemeUpdate', groundThemeId: data.groundThemeId, timestamp: Date.now() }));
     },
 
+    // 與 Unity 無關：任何方案的區域與工作燈都能隨時開關，不看目前方案、也不看是否切換中。
     madmapperControl(ws, data) {
       const enabled = data.enabled === true;
-      const isLight = Object.prototype.hasOwnProperty.call(madmapper.lightMap, data.surface);
-      const { areaMap, targetMap } = madmapper.profiles[state.activeProfile];
-      const isArea = Object.prototype.hasOwnProperty.call(areaMap, data.surface);
-
-      if (!isLight && !isArea) {
-        reject(ws, 'madmapperControl', 'notInProfile');
-        return;
-      }
-      if (!isLight && switcher.isSwitching()) {
-        reject(ws, 'madmapperControl', 'switching');
+      const owner = findMadmapperOwner(data.surface);
+      if (!owner) {
+        reject(ws, 'madmapperControl', 'unknownSurface');
         return;
       }
 
-      if (isLight) {
-        state.lightStates[data.surface] = enabled;
-      } else {
-        activeState().surfaceStates[data.surface] = enabled;
-      }
+      owner.states[data.surface] = enabled;
       saveState();
-      sendOsc(createMadmapperOscMessage(targetMap, data.surface, enabled));
+      sendOsc(createMadmapperOscMessage(owner.targets, data.surface, enabled));
       publishToConsoles({ type: 'madmapperStatusUpdate', surface: data.surface, enabled }, { exclude: ws });
     },
 
@@ -560,9 +578,7 @@ function startServer({
       const handler = Object.prototype.hasOwnProperty.call(handlers, data.type) ? handlers[data.type] : null;
       if (!handler) return;
 
-      const isLightToggle = data.type === 'madmapperControl'
-        && Object.prototype.hasOwnProperty.call(madmapper.lightMap, data.surface);
-      if (BLOCKED_WHILE_SWITCHING.has(data.type) && !isLightToggle && switcher.isSwitching()) {
+      if (BLOCKED_WHILE_SWITCHING.has(data.type) && switcher.isSwitching()) {
         reject(ws, data.type, 'switching');
         return;
       }
@@ -589,6 +605,7 @@ function startServer({
     wss.once('listening', () => {
       wss.off('error', reject);
       log(`Control server listening on ${wss.address().port}; active profile ${state.activeProfile}`);
+      syncMadmapper();
       resolve({
         port: wss.address().port,
         getState: () => state,

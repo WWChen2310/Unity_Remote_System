@@ -72,14 +72,14 @@ function kinds(log, ignore = ['save', 'switchChanged']) {
   return result;
 }
 
-test('switchTo blacks out, activates, waits, settles and restores in that order', async () => {
+test('switchTo activates, waits and settles in that order', async () => {
   const { switcher, log, getState } = createHarness();
 
   const result = await switcher.switchTo('s1');
 
   assert.deepEqual(result, { ok: true });
   assert.deepEqual(kinds(log), [
-    'stopAutoCycle', 'osc', 'agent-activate', 'waitFor', 'delay', 'osc', 'switchCompleted',
+    'stopAutoCycle', 'agent-activate', 'waitFor', 'delay', 'switchCompleted',
   ]);
   assert.deepEqual(log.find(({ kind }) => kind === 'waitFor').args, ['s1', ['both']]);
   assert.equal(log.find(({ kind }) => kind === 'delay').ms, 3000);
@@ -88,29 +88,16 @@ test('switchTo blacks out, activates, waits, settles and restores in that order'
   assert.equal(getState().switch.from, 's2');
 });
 
-test('the blackout turns off every area of every profile and leaves the work lights alone', async () => {
-  const { switcher, log } = createHarness();
-
-  await switcher.switchTo('s1');
-
-  const activateIndex = log.findIndex(({ kind }) => kind === 'agent-activate');
-  const blackout = log.slice(0, activateIndex).filter(({ kind }) => kind === 'osc');
-  assert.equal(blackout.length, 6 + 6);
-  assert.ok(blackout.every(({ value }) => value === 0));
-  assert.equal(blackout.some(({ address }) => address.includes('Light')), false);
-});
-
-test('the restore sends the target profile state and nothing else', async () => {
+// MadMapper 與 Unity 脫鉤（2026-10）：切換只換 Unity，區域開關完全由控制台手動決定。
+test('switching never sends anything to MadMapper and leaves the saved switches alone', async () => {
   const { switcher, log, getState } = createHarness();
-  getState().profiles.s1.surfaceStates['T5-s1'] = false;
+  const before = JSON.stringify([getState().profiles.s1.surfaceStates, getState().profiles.s2.surfaceStates]);
 
   await switcher.switchTo('s1');
+  await switcher.restartActive();
 
-  const delayIndex = log.findIndex(({ kind }) => kind === 'delay');
-  const restore = log.slice(delayIndex).filter(({ kind }) => kind === 'osc');
-  assert.equal(restore.length, 6);
-  assert.equal(restore.find(({ address }) => address === '/surfaces/Main-s1/opacity').value, 1);
-  assert.equal(restore.find(({ address }) => address === '/surfaces/T5-s1/opacity').value, 0);
+  assert.equal(log.some(({ kind }) => kind === 'osc'), false);
+  assert.equal(JSON.stringify([getState().profiles.s1.surfaceStates, getState().profiles.s2.surfaceStates]), before);
 });
 
 // 新的 Unity 一連上就會收到狀態，那一刻必須已經是目標方案的 view。
@@ -129,7 +116,7 @@ test('every step is saved and announced', async () => {
 
   assert.deepEqual(
     log.filter(({ kind }) => kind === 'switchChanged').map(({ step }) => step),
-    ['blackout', 'starting', 'waitingForRooms', 'settling', 'restoring'],
+    ['starting', 'waitingForRooms', 'settling'],
   );
 });
 
@@ -178,7 +165,7 @@ test('an unknown profile is rejected without side effects', async () => {
   assert.deepEqual(log, []);
 });
 
-test('an agent failure leaves status failed at step starting and sends no restore', async () => {
+test('an agent failure leaves status failed at step starting', async () => {
   const { switcher, log, getState } = createHarness({
     agentBehaviour: async () => { throw new Error('agent offline'); },
   });
@@ -190,8 +177,6 @@ test('an agent failure leaves status failed at step starting and sends no restor
   assert.deepEqual(getState().switch, {
     status: 'failed', from: 's2', to: 's1', step: 'starting', startedAt: getState().switch.startedAt, error: 'agent offline',
   });
-  const activateIndex = log.findIndex(({ kind }) => kind === 'agent-activate');
-  assert.equal(log.slice(activateIndex).some(({ kind, value }) => kind === 'osc' && value === 1), false);
   assert.equal(log.at(-1).kind, 'switchChanged');
 });
 
@@ -237,26 +222,14 @@ test('restartActive switches to the active profile again', async () => {
   assert.equal(getState().switch.to, 's2');
 });
 
-test('ensureActive only restores opacity when nothing had to start', async () => {
-  const { switcher, log } = createHarness({ agentBehaviour: async () => ({ started: [] }) });
-
-  const result = await switcher.ensureActive();
-
-  assert.deepEqual(result, { ok: true, started: 0 });
-  assert.deepEqual(kinds(log), ['agent-ensure', 'osc']);
-  const osc = log.filter(({ kind }) => kind === 'osc');
-  // 其他方案的區域一律關掉，目前方案依狀態恢復；重開機後 MadMapper 可能留著舊的開關。
-  assert.equal(osc.length, 6 + 6);
-  assert.equal(osc.find(({ address }) => address === '/surfaces/Main-s1/opacity').value, 0);
-});
-
-test('ensureActive waits for rooms when the agent started processes', async () => {
+test('ensureActive only asks the agent to keep the active profile running', async () => {
   const { switcher, log } = createHarness();
 
   const result = await switcher.ensureActive();
 
   assert.deepEqual(result, { ok: true, started: 1 });
-  assert.deepEqual(kinds(log), ['agent-ensure', 'waitFor', 'delay', 'osc']);
+  assert.deepEqual(kinds(log), ['agent-ensure']);
+  assert.equal(log.find(({ kind }) => kind === 'agent-ensure').payload.profileId, 's2');
 });
 
 test('ensureActive does nothing while a switch is in progress or has failed', async () => {

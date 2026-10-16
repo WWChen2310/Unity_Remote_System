@@ -281,10 +281,24 @@
         .table-btn:active {
             transform: translateY(1px);
         }
+        .area-group-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            margin: 4px 0 6px;
+        }
         .area-group-title {
             font-size: 0.8rem;
             color: #6c757d;
-            margin: 4px 0 6px;
+        }
+        .area-group-title .area-group-active {
+            color: var(--bs-success, #198754);
+            font-weight: 600;
+        }
+        .area-group-actions .btn {
+            min-height: 32px;
+            padding: 2px 10px;
         }
         .area-group + .area-group {
             margin-top: 12px;
@@ -422,7 +436,7 @@
                     <div class="progress mt-2" style="height: 6px;">
                         <div class="progress-bar progress-bar-striped progress-bar-animated" id="profileProgressBar" style="width: 0%"></div>
                     </div>
-                    <small class="text-muted d-block mt-2">切換期間全場黑畫面，方案控制暫停；工作燈與 Logo 仍可操作。</small>
+                    <small class="text-muted d-block mt-2">切換期間 Unity 會重新啟動，播放相關控制暫停；MadMapper 區域不會自動開關，需要遮住畫面請先在「投影與燈光」關閉區域。區域、工作燈與 Logo 隨時可操作。</small>
                 </div>
                 <div class="alert alert-danger mt-3 mb-0" id="profileError" style="display:none;">
                     <div id="profileErrorText"></div>
@@ -536,23 +550,14 @@
                     </div>
             </div>
         </div></section>
-<section class="control-panel" id="panel-projection" role="tabpanel" aria-labelledby="tab-projection" tabindex="0" hidden><div class="card" id="areaControls" data-lock-while-switching>
+<section class="control-panel" id="panel-projection" role="tabpanel" aria-labelledby="tab-projection" tabindex="0" hidden><div class="card" id="areaControls">
             <div class="card-body">
-                <h6 class="card-subtitle mb-3 text-muted">
-                    <i class="bi bi-grid"></i> 區域控制
+                <h6 class="card-subtitle mb-1 text-muted">
+                    <i class="bi bi-grid"></i> MadMapper 區域
                 </h6>
+                <small class="text-muted d-block mb-3">直接開關 MadMapper 的投影區域，與 Unity 播放哪一版無關；切換版本不會自動開關，切換中也可以操作。</small>
                 <div id="areaControlGroups">
-                    <!-- 由 JS 依目前投影方案產生 -->
-                </div>
-                <div class="mt-3">
-                    <button class="btn btn-sm btn-outline-primary w-100" id="enableAllAreas" onclick="toggleAllSurfaces(true)">
-                        <i class="bi bi-check-all"></i> 全部開啟
-                    </button>
-                </div>
-                <div class="mt-2">
-                    <button class="btn btn-sm btn-outline-secondary w-100" id="disableAllAreas" onclick="toggleAllSurfaces(false)">
-                        <i class="bi bi-x-circle"></i> 全部關閉
-                    </button>
+                    <!-- 由 JS 依 profileCatalog 產生，每個版本一組 -->
                 </div>
             </div>
         </div>
@@ -794,11 +799,9 @@
         let connectedRooms = [];
 
         const SWITCH_STEP_LABELS = {
-            blackout: '熄燈中',
             starting: '啟動 Unity',
             waitingForRooms: '等待 Unity 連線',
-            settling: '等待畫面穩定',
-            restoring: '恢復投影'
+            settling: '等待畫面穩定'
         };
         const SWITCH_STEPS = Object.keys(SWITCH_STEP_LABELS);
 
@@ -806,7 +809,7 @@
             switching: '投影方案切換中，請稍候',
             seatLocked: '目前背景下座位無法操作',
             seatOutOfRange: '這個投影方案沒有這個座位狀態',
-            notInProfile: '這個區域不屬於目前的投影方案',
+            unknownSurface: '伺服器不認得這個區域，請重新整理控制台',
             groundUnsupported: '這個投影方案沒有地面內容',
             agentOffline: 'Unity 主機的代理程式離線，無法切換投影方案',
             unknownProfile: '找不到這個投影方案',
@@ -866,39 +869,42 @@
             return profileCatalog.find(profile => profile.id === activeProfileId) || null;
         }
 
-        function activeAreaNames() {
-            const profile = activeProfile();
-            return profile ? profile.areas.map(area => area.name) : [];
-        }
-
-        // 區域可用 group 分組顯示；沒有分組的方案（目前兩版都是）全部放同一個格子。
+        // MadMapper 區域與 Unity 脫鉤：每個版本一組、永遠都顯示，標出目前 Unity 播放的是哪一版。
         // 按鈕顯示 label（Main、T1…），送給伺服器的是 name（MadMapper 的 surface 名稱，例如 Main-s1）。
-        function renderAreaGroups(profile) {
+        function renderAreaGroups() {
             const container = document.getElementById('areaControlGroups');
             container.innerHTML = '';
-            const groups = [];
-            profile.areas.forEach(area => {
-                const key = area.group || '';
-                let group = groups.find(g => g.key === key);
-                if (!group) {
-                    group = { key, areas: [] };
-                    groups.push(group);
-                }
-                group.areas.push(area);
-            });
-
-            groups.forEach(group => {
+            profileCatalog.forEach(profile => {
                 const wrapper = document.createElement('div');
                 wrapper.className = 'area-group';
-                if (group.key) {
-                    const title = document.createElement('div');
-                    title.className = 'area-group-title';
-                    title.textContent = group.key;
-                    wrapper.appendChild(title);
+
+                const head = document.createElement('div');
+                head.className = 'area-group-head';
+                const title = document.createElement('div');
+                title.className = 'area-group-title';
+                title.textContent = profile.label;
+                if (profile.id === activeProfileId) {
+                    const active = document.createElement('span');
+                    active.className = 'area-group-active';
+                    active.textContent = ' · Unity 播放中';
+                    title.appendChild(active);
                 }
+                const actions = document.createElement('div');
+                actions.className = 'area-group-actions btn-group';
+                [[true, '全開', 'btn-outline-primary'], [false, '全關', 'btn-outline-secondary']].forEach(([enabled, text, style]) => {
+                    const button = document.createElement('button');
+                    button.type = 'button';
+                    button.className = `btn btn-sm ${style}`;
+                    button.textContent = text;
+                    button.onclick = () => toggleProfileAreas(profile.id, enabled);
+                    actions.appendChild(button);
+                });
+                head.append(title, actions);
+                wrapper.appendChild(head);
+
                 const grid = document.createElement('div');
                 grid.className = 'surface-grid';
-                fillSurfaceGrid(grid, group.areas.map(area => ({ SurfaceName: area.name, ShowName: area.label || area.name })));
+                fillSurfaceGrid(grid, profile.areas.map(area => ({ SurfaceName: area.name, ShowName: area.label || area.name })));
                 wrapper.appendChild(grid);
                 container.appendChild(wrapper);
             });
@@ -959,7 +965,7 @@
             modeNames[8] = label8;
 
             initTableControls(profile);
-            renderAreaGroups(profile);
+            renderAreaGroups();
             renderCycleModesList();
             updateContentMode(currentContentMode);
         }
@@ -1211,11 +1217,11 @@
             console.log(`- 內容模式: ${state.contentMode}`);
         }
 
-        // 批次切換目前方案的所有投影區域（不含工作燈）
-        function toggleAllSurfaces(enabled) {
-            activeAreaNames().forEach(name => {
-                toggleSurface(name, enabled);
-            });
+        // 一次開關某一版的所有 MadMapper 區域（不含工作燈）
+        function toggleProfileAreas(profileId, enabled) {
+            const profile = profileCatalog.find(p => p.id === profileId);
+            if (!profile) return;
+            profile.areas.forEach(area => toggleSurface(area.name, enabled));
         }
 
         //#region projection profile
@@ -1331,7 +1337,8 @@
                 return;
             }
             if (profileId === activeProfileId && switchState.status === 'idle') return;
-            const message = `切換到「${profileLabel(profileId)}」？\n\n約需 1–2 分鐘，期間全場黑畫面，其他控制暫停。`;
+            const message = `切換到「${profileLabel(profileId)}」？\n\n約需 1–2 分鐘，期間 Unity 重新啟動、播放控制暫停。
+MadMapper 區域不會自動關閉，需要的話請先手動關。`;
             if (!confirm(message)) return;
             ws.send(JSON.stringify({ type: 'switchProfile', profileId }));
         }
@@ -1341,7 +1348,7 @@
                 alert('未連接到伺服器!');
                 return;
             }
-            if (!confirm(`重新啟動「${profileLabel(activeProfileId)}」？\n\n期間全場黑畫面。`)) return;
+            if (!confirm(`重新啟動「${profileLabel(activeProfileId)}」？\n\n期間 Unity 重新啟動；MadMapper 區域不會自動關閉。`)) return;
             ws.send(JSON.stringify({ type: 'restartProfile' }));
         }
 

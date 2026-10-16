@@ -1,16 +1,16 @@
 'use strict';
 
-const { createMadmapperOscMessage } = require('./control-model');
-
 /** 切換步驟，依序執行；控制台用同一組名稱顯示進度。 */
-const SWITCH_STEPS = Object.freeze(['blackout', 'starting', 'waitingForRooms', 'settling', 'restoring']);
+const SWITCH_STEPS = Object.freeze(['starting', 'waitingForRooms', 'settling']);
 
 /**
  * 投影方案切換的狀態機。所有外部依賴都由建構參數注入，可以直接測試。
  *
- * 流程：停自動循環 → activeProfile 改成目標 → 全部方案的區域 opacity 0 →
- * agent 啟動目標 build → 等該方案的每個角色都連上 → 等 Spout 建立 → 恢復目標方案的區域。
- * 任何一步失敗就停在 failed，區域維持 0，不自動重試：交給操作者決定重試或回到原方案。
+ * 流程：停自動循環 → activeProfile 改成目標 → agent 啟動目標 build →
+ * 等該方案的每個角色都連上 → 等 Spout 建立。任何一步失敗就停在 failed，不自動重試：
+ * 交給操作者決定重試或回到原方案。
+ *
+ * MadMapper 與切換脫鉤（2026-10）：這裡不送任何 OSC，區域開關完全由控制台手動決定。
  *
  * activeProfile 在第一步就改成目標：新的 Unity 一連上就會收到狀態，那一刻必須已是目標方案的 view。
  */
@@ -18,8 +18,6 @@ class ProfileSwitcher {
   constructor({
     store,
     profiles,
-    madmapper,
-    sendOsc,
     agent,
     presence,
     delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
@@ -30,8 +28,6 @@ class ProfileSwitcher {
   }) {
     this.store = store;
     this.profiles = profiles;
-    this.madmapper = madmapper;
-    this.sendOsc = sendOsc;
     this.agent = agent;
     this.presence = presence;
     this.delay = delay;
@@ -84,9 +80,6 @@ class ProfileSwitcher {
     };
 
     try {
-      this.blackoutAllProfiles();
-
-      enter('starting');
       const since = this.now();
       await this.agent.request('activate', { profileId: to });
 
@@ -95,9 +88,6 @@ class ProfileSwitcher {
 
       enter('settling');
       await this.delay(profile.settleMs);
-
-      enter('restoring');
-      this.restoreProfileSurfaces(to);
 
       this.store.update((state) => {
         state.switch = { status: 'idle', from, to, step: null, startedAt, error: null };
@@ -115,10 +105,7 @@ class ProfileSwitcher {
     }
   }
 
-  /**
-   * agent 每次連上時呼叫：確保目前方案在跑（現場重開機後會自動啟動），再把 MadMapper
-   * 的區域對齊狀態。重開機後 MadMapper 可能留著上次專案存檔時的開關，所以其他方案一律關掉。
-   */
+  /** agent 每次連上時呼叫：確保目前方案在跑（現場重開機後會自動啟動）。 */
   async ensureActive() {
     const state = this.store.get();
     if (state.switch.status !== 'idle') {
@@ -126,47 +113,13 @@ class ProfileSwitcher {
     }
 
     const active = state.activeProfile;
-    const profile = this.profiles.byId[active];
     try {
-      const since = this.now();
       const result = await this.agent.request('ensure', { profileId: active });
       const started = Array.isArray(result && result.started) ? result.started.length : 0;
-      if (started > 0) {
-        await this.presence.waitFor(active, profile.rooms, { since, timeoutMs: profile.readyTimeoutMs });
-        await this.delay(profile.settleMs);
-      }
-      this.blackoutOtherProfiles(active);
-      this.restoreProfileSurfaces(active);
       return { ok: true, started };
     } catch (error) {
       this.log(`ensure ${active} failed: ${error.message}`);
       return { ok: false, reason: 'error', error: error.message };
-    }
-  }
-
-  blackoutAllProfiles() {
-    for (const profileId of this.profiles.ids) {
-      this.sendProfileAreas(profileId, () => false);
-    }
-  }
-
-  blackoutOtherProfiles(activeProfileId) {
-    for (const profileId of this.profiles.ids) {
-      if (profileId !== activeProfileId) {
-        this.sendProfileAreas(profileId, () => false);
-      }
-    }
-  }
-
-  restoreProfileSurfaces(profileId) {
-    const surfaceStates = this.store.get().profiles[profileId].surfaceStates;
-    this.sendProfileAreas(profileId, (name) => surfaceStates[name] === true);
-  }
-
-  sendProfileAreas(profileId, isEnabled) {
-    const { areas, targetMap } = this.madmapper.profiles[profileId];
-    for (const { name } of areas) {
-      this.sendOsc(createMadmapperOscMessage(targetMap, name, isEnabled(name)));
     }
   }
 }

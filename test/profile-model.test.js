@@ -285,7 +285,7 @@ test('createRoomState sends s2 nine direct seats and its ground theme', () => {
   assert.deepEqual(room.tableModes, [0, 0, 0, 0, 0, 0, 0, 0, 4]);
 });
 
-test('createConsoleState exposes only the active areas plus the work lights', () => {
+test('createConsoleState exposes the areas of every profile plus the work lights', () => {
   const ctx = viewContext();
   const state = { ...ctx.state, activeProfile: 's1' };
 
@@ -294,7 +294,7 @@ test('createConsoleState exposes only the active areas plus the work lights', ()
   assert.equal(view.activeProfile, 's1');
   assert.ok('Main-s1' in view.surfaceStates);
   assert.ok('Light1' in view.surfaceStates);
-  assert.equal('Main-s2' in view.surfaceStates, false);
+  assert.ok('Main-s2' in view.surfaceStates, 'the console controls both profiles');
   assert.equal(view.tableModes.length, 9);
   assert.equal(view.groundThemeId, 'none');
   assert.deepEqual(view.agent, { connected: true });
