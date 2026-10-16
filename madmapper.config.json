@@ -5,28 +5,33 @@
   "profiles": {
     "s1": {
       "areas": [
-        { "name": "Main-s1", "label": "Main", "oscAddress": "/surfaces/Main-s1/opacity", "defaultOn": true },
-        { "name": "T1-s1", "label": "T1", "oscAddress": "/surfaces/T1-s1/opacity", "defaultOn": true },
-        { "name": "T2-s1", "label": "T2", "oscAddress": "/surfaces/T2-s1/opacity", "defaultOn": true },
-        { "name": "T3-s1", "label": "T3", "oscAddress": "/surfaces/T3-s1/opacity", "defaultOn": true },
-        { "name": "T4-s1", "label": "T4", "oscAddress": "/surfaces/T4-s1/opacity", "defaultOn": true },
-        { "name": "T5-s1", "label": "T5", "oscAddress": "/surfaces/T5-s1/opacity", "defaultOn": true }
+        { "name": "Main-s1", "label": "Main", "oscAddress": "/surfaces/S1/Main-S1/opacity", "defaultOn": true },
+        { "name": "T1-s1", "label": "T1", "oscAddress": "/surfaces/S1/T1-S1/opacity", "defaultOn": true },
+        { "name": "T2-s1", "label": "T2", "oscAddress": "/surfaces/S1/T2-S1/opacity", "defaultOn": true },
+        { "name": "T3-s1", "label": "T3", "oscAddress": "/surfaces/S1/T3-S1/opacity", "defaultOn": true },
+        { "name": "T4-s1", "label": "T4", "oscAddress": "/surfaces/S1/T4-S1/opacity", "defaultOn": true },
+        { "name": "T5-s1", "label": "T5", "oscAddress": "/surfaces/S1/T5-S1/opacity", "defaultOn": true }
+      ],
+      "lights": [
+        { "name": "Light1-s1", "label": "工作燈 1", "oscAddress": "/surfaces/S1/Light1-S1/opacity" },
+        { "name": "Light2-s1", "label": "工作燈 2", "oscAddress": "/surfaces/S1/Light2-S1/opacity" },
+        { "name": "Light3-s1", "label": "工作燈 3", "oscAddress": "/surfaces/S1/Light3-S1/opacity" }
       ]
     },
     "s2": {
       "areas": [
-        { "name": "Main-s2", "label": "Main", "oscAddress": "/surfaces/Main-s2/opacity" },
-        { "name": "T1-s2", "label": "T1", "oscAddress": "/surfaces/T1-s2/opacity" },
-        { "name": "T2-s2", "label": "T2", "oscAddress": "/surfaces/T2-s2/opacity" },
-        { "name": "T3-s2", "label": "T3", "oscAddress": "/surfaces/T3-s2/opacity" },
-        { "name": "T4-s2", "label": "T4", "oscAddress": "/surfaces/T4-s2/opacity" },
-        { "name": "Ground-s2", "label": "Ground", "oscAddress": "/surfaces/Ground-s2/opacity" }
+        { "name": "Main-s2", "label": "Main", "oscAddress": "/surfaces/S2/Main-S2/opacity" },
+        { "name": "T1-s2", "label": "T1", "oscAddress": "/surfaces/S2/T1-S2/opacity" },
+        { "name": "T2-s2", "label": "T2", "oscAddress": "/surfaces/S2/T2-S2/opacity" },
+        { "name": "T3-s2", "label": "T3", "oscAddress": "/surfaces/S2/T3-S2/opacity" },
+        { "name": "T4-s2", "label": "T4", "oscAddress": "/surfaces/S2/T4-S2/opacity" },
+        { "name": "Ground-s2", "label": "Ground", "oscAddress": "/surfaces/S2/Ground-S2/opacity" }
+      ],
+      "lights": [
+        { "name": "Light1-s2", "label": "工作燈 1", "oscAddress": "/surfaces/S2/Light1-S2/opacity" },
+        { "name": "Light2-s2", "label": "工作燈 2", "oscAddress": "/surfaces/S2/Light2-S2/opacity" },
+        { "name": "Light3-s2", "label": "工作燈 3", "oscAddress": "/surfaces/S2/Light3-S2/opacity" }
       ]
     }
-  },
-  "lights": [
-    { "name": "Light1", "oscAddress": "/surfaces/Light1/opacity" },
-    { "name": "Light2", "oscAddress": "/surfaces/Light2/opacity" },
-    { "name": "Light3", "oscAddress": "/surfaces/Light3/opacity" }
-  ]
+  }
 }

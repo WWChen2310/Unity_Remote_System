@@ -12,10 +12,7 @@
     // 座位上限。各投影方案實際用幾席由伺服器的方案目錄決定（s1 為 8、s2 為 9），
     // 投影區域清單也改由方案目錄提供，這裡不再寫死。
     const SEAT_COUNT = 9;
-    // 工作燈與投影區域走同一條 MadMapper OSC 路徑，只是介面分開顯示。
-    // 名稱要與 madmapper.config.json 的 lights 一致，OSC address 在那邊設定。
-    const LIGHT_NAMES = Object.freeze(['Light1', 'Light2', 'Light3']);
-    const LIGHT_LABELS = Object.freeze({ Light1: '燈 1', Light2: '燈 2', Light3: '燈 3' });
+    // 工作燈與投影區域一樣由伺服器的方案目錄提供（每版各自一組），這裡不寫死。
 
     // 座位個別控制的狀態。value 就是送給 Unity 的 tableModes 值，
     // 同時是 Unity StatusSetting.settings 的索引，兩邊順序不可各自調動。
@@ -78,8 +75,6 @@
     return Object.freeze({
         describeProfile,
         SEAT_COUNT,
-        LIGHT_NAMES,
-        LIGHT_LABELS,
         SEAT_MODES,
         isValidSeatMode,
         createSeatSettings,

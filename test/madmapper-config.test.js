@@ -5,33 +5,42 @@ const assert = require('node:assert/strict');
 
 const { validateMadmapperConfig } = require('../control-model');
 
-// 現場 MadMapper 的 surface 名稱以「-s1」「-s2」區分版本（2026-10 起）。
-// name 必須與 MadMapper 完全一致，否則按了沒反應而且沒有錯誤；label 是控制台上顯示的短名稱。
-const expectedAreas = (suffix, labels) => labels.map((label) => ({
-  name: `${label}-${suffix}`,
-  label,
-  oscAddress: `/surfaces/${label}-${suffix}/opacity`,
-}));
+// 現場 MadMapper 的 OSC 位址是 /surfaces/<版本>/<名稱>-<版本>/opacity（2026-10 起），
+// 例如 /surfaces/S1/Main-S1/opacity。位址必須一字不差，否則按了沒反應而且沒有錯誤。
+// name 是狀態檔與控制台指令用的 key（小寫版本代號），label 是按鈕上的字。
+const expectedTargets = (profileId, labels) => labels.map((label) => {
+  const tag = profileId.toUpperCase();
+  return { name: `${label}-${profileId}`, label, oscAddress: `/surfaces/${tag}/${label}-${tag}/opacity` };
+});
+const lightTargets = (profileId) => [1, 2, 3].map((n) => {
+  const tag = profileId.toUpperCase();
+  return { name: `Light${n}-${profileId}`, label: `工作燈 ${n}`, oscAddress: `/surfaces/${tag}/Light${n}-${tag}/opacity` };
+});
+const pick = (targets) => targets.map(({ name, label, oscAddress }) => ({ name, label, oscAddress }));
 
 test('s1 has the six table surfaces Main and T1–T5, all on by default, ungrouped', () => {
   const validated = validateMadmapperConfig(require('../madmapper.config.json'));
   const { areas } = validated.profiles.s1;
 
-  assert.deepEqual(
-    areas.map(({ name, label, oscAddress }) => ({ name, label, oscAddress })),
-    expectedAreas('s1', ['Main', 'T1', 'T2', 'T3', 'T4', 'T5']),
-  );
+  assert.deepEqual(pick(areas), expectedTargets('s1', ['Main', 'T1', 'T2', 'T3', 'T4', 'T5']));
   assert.ok(areas.every(({ defaultOn }) => defaultOn));
   assert.ok(areas.every(({ group }) => group === null));
 });
 
-test('s2 keeps its six surfaces under the -s2 MadMapper names', () => {
+test('s2 has its six surfaces under the /surfaces/S2/ addresses', () => {
   const validated = validateMadmapperConfig(require('../madmapper.config.json'));
 
-  assert.deepEqual(
-    validated.profiles.s2.areas.map(({ name, label, oscAddress }) => ({ name, label, oscAddress })),
-    expectedAreas('s2', ['Main', 'T1', 'T2', 'T3', 'T4', 'Ground']),
-  );
+  assert.deepEqual(pick(validated.profiles.s2.areas), expectedTargets('s2', ['Main', 'T1', 'T2', 'T3', 'T4', 'Ground']));
+});
+
+test('each profile has its own three work lights, off by default', () => {
+  const validated = validateMadmapperConfig(require('../madmapper.config.json'));
+
+  for (const profileId of ['s1', 's2']) {
+    const { lights } = validated.profiles[profileId];
+    assert.deepEqual(pick(lights), lightTargets(profileId), profileId);
+    assert.ok(lights.every(({ defaultOn }) => defaultOn === false), profileId);
+  }
 });
 
 test('an area without a label shows its name', () => {
@@ -43,29 +52,13 @@ test('an area without a label shows its name', () => {
   assert.throws(() => validateMadmapperConfig(config), /label must be a nonempty string/);
 });
 
-// 介面的燈名與 config 的燈名若不一致，按鈕會送出伺服器不認得的名字，
-// 而伺服器只會 console.warn——現場看起來就是「按了沒反應」而且沒有錯誤。
-// 這個測試把兩邊釘在一起，改了一邊沒改另一邊就會在這裡失敗。
-test('work light names in the console match the shipped MadMapper config', () => {
-  const validated = validateMadmapperConfig(require('../madmapper.config.json'));
-  const { LIGHT_NAMES, LIGHT_LABELS } = require('../interface/control-settings');
-
-  assert.deepEqual(validated.lights.map(({ name }) => name), [...LIGHT_NAMES]);
-
-  for (const name of LIGHT_NAMES) {
-    assert.equal(typeof LIGHT_LABELS[name], 'string', `${name} needs a display label`);
-  }
-});
-
-test('every profile reaches its own areas and all work lights through one target map', () => {
+test('every profile reaches its own areas and work lights through one target map', () => {
   const validated = validateMadmapperConfig(require('../madmapper.config.json'));
 
-  for (const profile of Object.values(validated.profiles)) {
-    for (const { name } of [...profile.areas, ...validated.lights]) {
-      assert.ok(
-        Object.prototype.hasOwnProperty.call(profile.targetMap, name),
-        `${name} must be reachable through targetMap`,
-      );
+  for (const [profileId, profile] of Object.entries(validated.profiles)) {
+    for (const { name } of [...profile.areas, ...profile.lights]) {
+      assert.ok(Object.prototype.hasOwnProperty.call(profile.targetMap, name), `${profileId}: ${name}`);
     }
   }
+  assert.equal(validated.profiles.s1.targetMap['Light1-s2'], undefined, 'lights are not shared between profiles');
 });

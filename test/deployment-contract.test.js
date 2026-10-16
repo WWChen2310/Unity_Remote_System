@@ -40,9 +40,14 @@ test('persisted state is v3 with one entry per projection profile', () => {
       profileId,
     );
     assert.ok(Object.values(profileState.surfaceStates).every((value) => typeof value === 'boolean'));
+    assert.deepEqual(
+      Object.keys(profileState.lightStates),
+      madmapper.profiles[profileId].lights.map(({ name }) => name),
+      profileId,
+    );
   }
 
-  assert.deepEqual(Object.keys(state.lightStates), madmapper.lights.map(({ name }) => name));
+  assert.equal('lightStates' in state, false);
 });
 
 test('README documents the complete current deployment contract', () => {
@@ -59,12 +64,10 @@ test('README documents the complete current deployment contract', () => {
     '`port`',
     '`localPort`',
     '`oscAddress`',
-    '`/surfaces/Main-s2/opacity`',
-    '`/surfaces/T1-s2/opacity`',
-    '`/surfaces/T2-s2/opacity`',
-    '`/surfaces/T3-s2/opacity`',
-    '`/surfaces/T4-s2/opacity`',
-    '`/surfaces/Ground-s2/opacity`',
+    '`/surfaces/S2/Main-S2/opacity`',
+    '`/surfaces/S1/Main-S1/opacity`',
+    '`/surfaces/S1/Light1-S1/opacity`',
+    '`profiles.<id>.lights`',
     '`Main-s2`、`T1-s2`、`T2-s2`、`T3-s2`、`T4-s2`、`Ground-s2`',
     '`Main-s1`、`T1-s1`～`T5-s1`',
     '`pm2 restart',

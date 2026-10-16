@@ -264,12 +264,13 @@ function startServer({
 
   /** 區域名稱在各方案間不重複（control-model 驗證過），所以名稱就能找到它屬於哪個方案。 */
   function findMadmapperOwner(name) {
-    if (Object.prototype.hasOwnProperty.call(madmapper.lightMap, name)) {
-      return { states: state.lightStates, targets: madmapper.lightMap };
-    }
-    for (const [profileId, { areaMap }] of Object.entries(madmapper.profiles)) {
+    for (const [profileId, { areaMap, lightMap }] of Object.entries(madmapper.profiles)) {
+      const profileState = state.profiles[profileId];
       if (Object.prototype.hasOwnProperty.call(areaMap, name)) {
-        return { states: state.profiles[profileId].surfaceStates, targets: areaMap };
+        return { states: profileState.surfaceStates, targets: areaMap };
+      }
+      if (Object.prototype.hasOwnProperty.call(lightMap, name)) {
+        return { states: profileState.lightStates, targets: lightMap };
       }
     }
     return null;
@@ -280,14 +281,14 @@ function startServer({
    * 專案存檔時的開關，這樣才會與控制台看到的一致。之後只有操作者按了才送。
    */
   function syncMadmapper() {
-    for (const [profileId, { areas, areaMap }] of Object.entries(madmapper.profiles)) {
-      const states = state.profiles[profileId].surfaceStates;
+    for (const [profileId, { areas, lights, targetMap }] of Object.entries(madmapper.profiles)) {
+      const { surfaceStates, lightStates } = state.profiles[profileId];
       for (const { name } of areas) {
-        sendOsc(createMadmapperOscMessage(areaMap, name, states[name] === true));
+        sendOsc(createMadmapperOscMessage(targetMap, name, surfaceStates[name] === true));
       }
-    }
-    for (const { name } of madmapper.lights) {
-      sendOsc(createMadmapperOscMessage(madmapper.lightMap, name, state.lightStates[name] === true));
+      for (const { name } of lights) {
+        sendOsc(createMadmapperOscMessage(targetMap, name, lightStates[name] === true));
+      }
     }
   }
 

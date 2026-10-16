@@ -4,12 +4,13 @@
 
 - 執行環境需為 `Node.js >= 18.1`。在本專案根目錄先執行 `npm ci`；沒有 lockfile 的情況才改用 `npm install`。
 - `madmapper.config.json` 是 MadMapper OSC 的唯一部署設定來源。請在 Node JSON 內修改 `ip`、`port`、`localPort`，以及每個區域完整的 `oscAddress`；OSC Address 不在 Unity Inspector 編輯。
-- 區域依投影方案分組，寫在 `profiles.<id>.areas`；工作燈寫在全域的 `lights`。舊格式（頂層 `areas`）會讓伺服器拒絕啟動，請改成新格式。
-- 每個區域有三個欄位：`name` 是 MadMapper 的 surface 名稱（也是狀態檔與控制台指令的 key），`label` 是控制台按鈕上顯示的短名稱，`oscAddress` 是送出的位址。MadMapper 以 `-s1`、`-s2` 結尾區分版本（2026-10 起）。
-- 第二版（2026-07，內部代號 s2）的六個區域依序為 `Main-s2`、`T1-s2`、`T2-s2`、`T3-s2`、`T4-s2`、`Ground-s2`（控制台顯示 `Main`、`T1`、`T2`、`T3`、`T4`、`Ground`）。預設位址分別是 `/surfaces/Main-s2/opacity`、`/surfaces/T1-s2/opacity`、`/surfaces/T2-s2/opacity`、`/surfaces/T3-s2/opacity`、`/surfaces/T4-s2/opacity`、`/surfaces/Ground-s2/opacity`。完整 `oscAddress` 字串皆可依 MadMapper 實際命名修改。
-- 舊狀態檔（2026-10 以前）用短名稱 `Main`、`T1`… 當 key；Node 讀到時會沿用到對應的新名稱，第二版已保存的開關不會遺失。第一版舊的 `Main-1`… 無法對應，回到預設的開啟。
+- 區域與工作燈都依投影方案分組：區域寫在 `profiles.<id>.areas`，工作燈寫在 `profiles.<id>.lights`（2026-10 起每版各自一組，預設各三盞）。舊格式（頂層 `areas` 或頂層 `lights`）會讓伺服器拒絕啟動，請改成新格式。
+- 每個區域與工作燈有三個欄位：`name` 是狀態檔與控制台指令用的 key（例如 `Main-s1`，跨版本不可重複，不要隨意改名），`label` 是控制台按鈕上的字，`oscAddress` 是實際送給 MadMapper 的位址。
+- MadMapper 的位址格式為 `/surfaces/<版本>/<名稱>-<版本>/opacity`，版本為大寫 `S1`、`S2`，例如 `/surfaces/S1/Main-S1/opacity`、`/surfaces/S2/Main-S2/opacity`、`/surfaces/S1/Light1-S1/opacity`。完整 `oscAddress` 字串皆可依 MadMapper 實際命名修改（在 MadMapper 右鍵 Copy OSC Address 對照）。
+- 第一版（2026-03，內部代號 s1）：區域 `Main-s1`、`T1-s1`～`T5-s1`（控制台顯示 `Main`、`T1`～`T5`，預設開啟，不分組），工作燈 `Light1-s1`～`Light3-s1`。
+- 第二版（2026-07，內部代號 s2）：區域依序為 `Main-s2`、`T1-s2`、`T2-s2`、`T3-s2`、`T4-s2`、`Ground-s2`（控制台顯示 `Main`、`T1`、`T2`、`T3`、`T4`、`Ground`），工作燈 `Light1-s2`～`Light3-s2`。
+- 舊狀態檔的遷移：2026-10 以前區域用短名稱 `Main`、`T1`… 當 key，Node 讀到時沿用到第二版的新名稱；第一版舊的 `Main-1`… 無法對應，回到預設的開啟。工作燈以前兩版共用（`Light1`…），讀到時把開關帶到兩個版本同編號的燈。
 - 首次啟動可執行 `npm start`（等同 `node integrated-server.js`）。修改 JSON 後必須重啟 Node：使用 PM2 時執行 `pm2 restart <應用程式名稱>`；直接啟動時先停止舊程序，再重新執行啟動指令。
-- 第一版（2026-03，內部代號 s1）的桌面有六個區域：`Main-s1`、`T1-s1`～`T5-s1`（控制台顯示 `Main`、`T1`～`T5`，預設開啟，不分組），位址為 `/surfaces/<名稱>/opacity`。
 - Node.js 負責傳送 OSC 給 MadMapper；Unity 不會傳送 OSC，也不需要安裝 Unity OSC 套件。
 
 ## Unity 九座位設定（第二版）
@@ -36,7 +37,7 @@ Web 伺服器必須同時部署 `interface/console.html` 與 `interface/control-
 
 - 第一版（s1）：8 席，只有「分割內容」可操作座位，狀態為預設／海洋／森林／液態食物；不顯示獨立地面控制，投影區域為 Main、T1～T5 六個。
 - 第二版（s2）：9 席，座位增加關燈／開燈，稻田／水草背景下停用座位效果；地面內容可獨立切換。
-- 各版本分別保存背景、座位、遮罩與投影區域；工作燈與 Logo 共用，切換期間仍可操作。
+- 各版本分別保存背景、座位、遮罩、投影區域與工作燈；Logo 兩版共用。MadMapper 區域、工作燈與 Logo 切換期間仍可操作。
 
 控制台最上方的「投影方案」可以切換兩套投影方式與內容：
 
@@ -49,7 +50,7 @@ Web 伺服器必須同時部署 `interface/console.html` 與 `interface/control-
 
 切換流程：關掉舊的 Unity、啟動新的 → 等新方案的每個實例都連上 → 等畫面穩定。全程約 1–2 分鐘，期間播放相關控制（背景、座位、地面、遮罩、切換）暫停。兩個方案各自保存背景、座位與遮罩，切回來時恢復上次的狀態。
 
-**MadMapper 與 Unity 脫鉤（2026-10）**：切換不會送任何 OSC 給 MadMapper，區域開關完全由控制台「投影與燈光」手動決定。控制台永遠顯示兩個版本各自的區域（標出 Unity 正在播放哪一版），隨時可開關，切換中也可以。需要在切換時遮住畫面，請先手動關閉區域。Node 只在啟動時把存檔中每個區域與工作燈的開關送給 MadMapper 一次，讓 MadMapper 重開後與控制台一致；agent 連線、切換、重新啟動都不會動 MadMapper。
+**MadMapper 與 Unity 脫鉤（2026-10）**：切換不會送任何 OSC 給 MadMapper，區域開關完全由控制台「投影與燈光」手動決定。控制台永遠顯示兩個版本各自的區域與工作燈（標出 Unity 正在播放哪一版），隨時可開關，切換中也可以。需要在切換時遮住畫面，請先手動關閉區域。Node 只在啟動時把存檔中每個區域與工作燈的開關送給 MadMapper 一次，讓 MadMapper 重開後與控制台一致；agent 連線、切換、重新啟動都不會動 MadMapper。
 
 ### 主機與設定檔
 

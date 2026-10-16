@@ -119,7 +119,10 @@ test('migrateSystemState moves a v2 file into profiles.s2 and seeds s1 defaults'
   assert.equal(state.profiles.s2.surfaceStates['T1-s2'], false);
   assert.equal(state.profiles.s2.surfaceStates['Ground-s2'], true);
   assert.equal('Light1' in state.profiles.s2.surfaceStates, false);
-  assert.deepEqual(state.lightStates, { Light1: true, Light2: false, Light3: false });
+  // 舊版工作燈兩版共用；現在每版各自一組，舊的開關帶到兩版同編號的燈。
+  assert.deepEqual(state.profiles.s2.lightStates, { 'Light1-s2': true, 'Light2-s2': false, 'Light3-s2': false });
+  assert.deepEqual(state.profiles.s1.lightStates, { 'Light1-s1': true, 'Light2-s1': false, 'Light3-s1': false });
+  assert.equal('lightStates' in state, false, 'no shared light state is kept');
 
   assert.equal(state.profiles.s1.maskMode, 1);
   assert.equal(state.profiles.s1.groundThemeId, 'none');
@@ -293,7 +296,8 @@ test('createConsoleState exposes the areas of every profile plus the work lights
 
   assert.equal(view.activeProfile, 's1');
   assert.ok('Main-s1' in view.surfaceStates);
-  assert.ok('Light1' in view.surfaceStates);
+  assert.ok('Light1-s1' in view.surfaceStates);
+  assert.ok('Light1-s2' in view.surfaceStates);
   assert.ok('Main-s2' in view.surfaceStates, 'the console controls both profiles');
   assert.equal(view.tableModes.length, 9);
   assert.equal(view.groundThemeId, 'none');

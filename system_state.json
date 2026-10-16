@@ -32,6 +32,11 @@
         "T3-s1": true,
         "T4-s1": true,
         "T5-s1": true
+      },
+      "lightStates": {
+        "Light1-s1": false,
+        "Light2-s1": false,
+        "Light3-s1": false
       }
     },
     "s2": {
@@ -56,13 +61,13 @@
         "T3-s2": false,
         "T4-s2": false,
         "Ground-s2": false
+      },
+      "lightStates": {
+        "Light1-s2": false,
+        "Light2-s2": false,
+        "Light3-s2": false
       }
     }
-  },
-  "lightStates": {
-    "Light1": false,
-    "Light2": false,
-    "Light3": false
   },
   "autoCycle": {
     "enabled": false,

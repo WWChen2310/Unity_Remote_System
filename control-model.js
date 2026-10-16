@@ -7,9 +7,6 @@ const { SEAT_MODES, isValidSeatMode } = require('./interface/control-settings');
 const SEAT_COUNT = 9;
 // 方案 id 就是 Unity build 回報的 BuildId，也會出現在 MadMapper 設定與狀態檔的鍵裡。
 const PROFILE_ID_PATTERN = /^[a-z0-9_-]+$/;
-// 工作燈不像投影區域那樣綁死實體配置，數量與名稱可在 madmapper.config.json 調整；
-// 這裡只是介面預設顯示的三盞。
-const LIGHT_NAMES = ['Light1', 'Light2', 'Light3'];
 
 function normalizeTableModes(value) {
   const source = Array.isArray(value) ? value : [];
@@ -68,24 +65,16 @@ function validateMadmapperConfig(config) {
     );
   }
 
-  // 工作燈與投影區域是不同的東西，但對 MadMapper 來說都只是「一個 OSC address 收 0/1」。
-  // 所以驗證、狀態保存、送 OSC 全部共用同一條路徑，只有介面分區顯示不同。
-  if (!Array.isArray(config.lights)) {
-    throw new TypeError('MadMapper lights must be an array');
+  // 舊格式的頂層 lights（兩版共用）也不做靜默相容：工作燈現在每版各有自己的 OSC 位址。
+  if (Object.prototype.hasOwnProperty.call(config, 'lights')) {
+    throw new Error(
+      'MadMapper config must list work lights under profiles.<id>.lights; '
+      + 'the shared top-level lights list is no longer supported',
+    );
   }
 
+  // 名稱是狀態檔與控制台指令的 key，跨方案、跨區域與工作燈都不能重複。
   const usedNames = new Set();
-  const lightMap = {};
-  const lights = config.lights.map((light, index) => {
-    const normalized = validateMadmapperTarget(light, index, 'light');
-    if (usedNames.has(normalized.name)) {
-      throw new Error(`MadMapper light name "${normalized.name}" is duplicated`);
-    }
-    usedNames.add(normalized.name);
-    lightMap[normalized.name] = normalized;
-    return normalized;
-  });
-
   const profiles = {};
   for (const [profileId, profileConfig] of Object.entries(config.profiles)) {
     if (!PROFILE_ID_PATTERN.test(profileId)) {
@@ -97,39 +86,26 @@ function validateMadmapperConfig(config) {
     if (profileConfig.areas.length === 0) {
       throw new Error(`MadMapper profile "${profileId}" must have at least one area`);
     }
+    if (profileConfig.lights !== undefined && !Array.isArray(profileConfig.lights)) {
+      throw new TypeError(`MadMapper profile "${profileId}" lights must be an array`);
+    }
 
-    const areaMap = {};
-    const areas = profileConfig.areas.map((area, index) => {
-      const { name, oscAddress } = validateMadmapperTarget(area, index, `area of profile "${profileId}"`);
-      if (usedNames.has(name)) {
-        throw new Error(`MadMapper area name "${name}" is duplicated`);
-      }
-      if (area.group !== undefined && area.group !== null && typeof area.group !== 'string') {
-        throw new TypeError(`MadMapper area "${name}" group must be a string`);
-      }
-      if (area.label !== undefined && (typeof area.label !== 'string' || area.label === '')) {
-        throw new TypeError(`MadMapper area "${name}" label must be a nonempty string`);
-      }
-      if (area.defaultOn !== undefined && typeof area.defaultOn !== 'boolean') {
-        throw new TypeError(`MadMapper area "${name}" defaultOn must be true or false`);
-      }
-
-      usedNames.add(name);
-      // name 是 MadMapper 的 surface 名稱，也是狀態檔與控制台指令用的 key；label 只用來顯示。
-      const normalizedArea = {
-        name,
-        label: area.label === undefined ? name : area.label,
-        oscAddress,
-        group: typeof area.group === 'string' ? area.group : null,
-        defaultOn: area.defaultOn === true,
-      };
-      areaMap[name] = normalizedArea;
-      return normalizedArea;
-    });
+    // 工作燈與投影區域對 MadMapper 來說都只是「一個 OSC address 收 0/1」，
+    // 所以驗證、狀態保存、送 OSC 共用同一條路徑，只有介面分區顯示不同。
+    const areas = profileConfig.areas.map((area, index) => (
+      normalizeTarget(area, index, `area of profile "${profileId}"`, usedNames)
+    ));
+    const lights = (profileConfig.lights || []).map((light, index) => (
+      normalizeTarget(light, index, `light of profile "${profileId}"`, usedNames)
+    ));
+    const areaMap = Object.fromEntries(areas.map((area) => [area.name, area]));
+    const lightMap = Object.fromEntries(lights.map((light) => [light.name, light]));
 
     profiles[profileId] = {
       areas,
       areaMap,
+      lights,
+      lightMap,
       targetMap: { ...areaMap, ...lightMap },
     };
   }
@@ -142,9 +118,35 @@ function validateMadmapperConfig(config) {
     ip: config.ip,
     port: config.port,
     localPort: config.localPort,
-    lights,
-    lightMap,
     profiles,
+  };
+}
+
+/**
+ * name：狀態檔與控制台指令用的 key；label：按鈕上的字；oscAddress：實際送給 MadMapper 的位址。
+ */
+function normalizeTarget(entry, index, kind, usedNames) {
+  const { name, oscAddress } = validateMadmapperTarget(entry, index, kind);
+  if (usedNames.has(name)) {
+    throw new Error(`MadMapper name "${name}" is duplicated`);
+  }
+  if (entry.group !== undefined && entry.group !== null && typeof entry.group !== 'string') {
+    throw new TypeError(`MadMapper ${kind} "${name}" group must be a string`);
+  }
+  if (entry.label !== undefined && (typeof entry.label !== 'string' || entry.label === '')) {
+    throw new TypeError(`MadMapper ${kind} "${name}" label must be a nonempty string`);
+  }
+  if (entry.defaultOn !== undefined && typeof entry.defaultOn !== 'boolean') {
+    throw new TypeError(`MadMapper ${kind} "${name}" defaultOn must be true or false`);
+  }
+
+  usedNames.add(name);
+  return {
+    name,
+    label: entry.label === undefined ? name : entry.label,
+    oscAddress,
+    group: typeof entry.group === 'string' ? entry.group : null,
+    defaultOn: entry.defaultOn === true,
   };
 }
 
@@ -201,7 +203,6 @@ module.exports = {
   PROFILE_ID_PATTERN,
   SEAT_MODES,
   isValidSeatMode,
-  LIGHT_NAMES,
   GROUND_THEMES,
   normalizeGroundThemeId,
   isValidGroundThemeId,

@@ -216,13 +216,18 @@ function createDefaultProfileState(profile, madmapperProfile) {
     surfaceStates: Object.fromEntries(
       madmapperProfile.areas.map(({ name, defaultOn }) => [name, defaultOn]),
     ),
+    lightStates: Object.fromEntries(
+      madmapperProfile.lights.map(({ name, defaultOn }) => [name, defaultOn]),
+    ),
   };
 }
 
-function normalizeProfileState(raw, profile, madmapperProfile) {
+/** legacyLights：2026-10 以前兩版共用的工作燈開關（key 為 Light1…），沒有新 key 時沿用。 */
+function normalizeProfileState(raw, profile, madmapperProfile, legacyLights = {}) {
   const defaults = createDefaultProfileState(profile, madmapperProfile);
   const source = isPlainObject(raw) ? raw : {};
   const surfaces = isPlainObject(source.surfaceStates) ? source.surfaceStates : {};
+  const lights = isPlainObject(source.lightStates) ? source.lightStates : {};
 
   return {
     contentMode: Number.isInteger(source.contentMode)
@@ -238,7 +243,21 @@ function normalizeProfileState(raw, profile, madmapperProfile) {
     surfaceStates: Object.fromEntries(
       madmapperProfile.areas.map((area) => [area.name, readSurfaceState(surfaces, area)]),
     ),
+    lightStates: Object.fromEntries(
+      madmapperProfile.lights.map((light) => [light.name, readLightState(lights, legacyLights, light)]),
+    ),
   };
+}
+
+/**
+ * 工作燈原本兩版共用（Light1…），2026-10 起每版各自一組（Light1-s1、Light1-s2…）。
+ * 沒有新 key 時，把共用時期同編號的開關帶到兩個版本。
+ */
+function readLightState(lights, legacyLights, { name, defaultOn }) {
+  if (Object.prototype.hasOwnProperty.call(lights, name)) return lights[name] === true;
+  const legacyName = name.replace(/-[^-]+$/, '');
+  if (Object.prototype.hasOwnProperty.call(legacyLights, legacyName)) return legacyLights[legacyName] === true;
+  return defaultOn;
 }
 
 /**
@@ -305,7 +324,7 @@ function normalizeAutoCycle(raw) {
 
 /**
  * 把磁碟上的狀態檔轉成 v3。沒有 version 的舊檔整份屬於 2026-07 版（s2），
- * 其他方案用預設值；工作燈的狀態從舊的 surfaceStates 搬到 lightStates。
+ * 其他方案用預設值；工作燈的狀態從舊的共用欄位帶到每個方案自己的 lightStates。
  */
 function migrateSystemState(raw, { profiles, madmapper }) {
   const source = isPlainObject(raw) ? raw : {};
@@ -341,9 +360,9 @@ function migrateSystemState(raw, { profiles, madmapper }) {
         profileSources[profileId],
         profiles.byId[profileId],
         madmapper.profiles[profileId],
+        lights,
       ),
     ])),
-    lightStates: Object.fromEntries(madmapper.lights.map(({ name }) => [name, lights[name] === true])),
     autoCycle: normalizeAutoCycle(source.autoCycle),
     // Logo 不屬於任何方案，切換方案也不會改變它。
     logo: normalizeLogoSettings(source.logo),
@@ -383,6 +402,7 @@ function createProfileCatalog(profiles, madmapper) {
       ground: profile.ground,
       modeLabels: { ...profile.modeLabels },
       areas: madmapper.profiles[profileId].areas.map(({ name, label, group }) => ({ name, label, group })),
+      lights: madmapper.profiles[profileId].lights.map(({ name, label }) => ({ name, label })),
     };
   });
 }
@@ -403,7 +423,10 @@ function createConsoleState(state, { profiles, madmapper, agentConnected = false
     groundThemeId: active.groundThemeId,
     tableModes: [...active.tableModes],
     // MadMapper 與目前方案脫鉤：控制台看得到也能操作每個方案的區域（名稱不重複，可直接合併）。
-    surfaceStates: Object.assign({}, ...Object.values(state.profiles).map((profile) => profile.surfaceStates), state.lightStates),
+    surfaceStates: Object.assign(
+      {},
+      ...Object.values(state.profiles).flatMap((profile) => [profile.surfaceStates, profile.lightStates]),
+    ),
     autoCycle: { ...state.autoCycle, modes: [...(state.autoCycle.modes || [])] },
     logo: { ...state.logo },
     profileCatalog: createProfileCatalog(profiles, madmapper),

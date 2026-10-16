@@ -244,16 +244,17 @@ test('Unity commands are rejected while switching but MadMapper stays controllab
   }
 
   site.oscLog.length = 0;
-  consoleClient.send({ type: 'madmapperControl', surface: 'Light1', enabled: true });
+  consoleClient.send({ type: 'madmapperControl', surface: 'Light1-s2', enabled: true });
   consoleClient.send({ type: 'madmapperControl', surface: 'Main-s1', enabled: false });
   consoleClient.send({ type: 'madmapperControl', surface: 'Ground-s2', enabled: true });
   await waitUntil(() => site.oscLog.length === 3);
   assert.deepEqual(site.oscLog.map(({ address, args }) => [address, args[0].value]), [
-    ['/surfaces/Light1/opacity', 1],
-    ['/surfaces/Main-s1/opacity', 0],
-    ['/surfaces/Ground-s2/opacity', 1],
+    ['/surfaces/S2/Light1-S2/opacity', 1],
+    ['/surfaces/S1/Main-S1/opacity', 0],
+    ['/surfaces/S2/Ground-S2/opacity', 1],
   ]);
-  assert.equal(site.server.getState().lightStates.Light1, true);
+  assert.equal(site.server.getState().profiles.s2.lightStates['Light1-s2'], true);
+  assert.equal(site.server.getState().profiles.s1.lightStates['Light1-s1'], false, 'the s1 light is a separate light');
   assert.equal(site.server.getState().profiles.s1.surfaceStates['Main-s1'], false);
   assert.equal(site.server.getState().profiles.s2.surfaceStates['Ground-s2'], true);
 });
@@ -267,7 +268,7 @@ test('areas of either profile can be toggled whichever profile is active', async
   consoleClient.send({ type: 'madmapperControl', surface: 'T3-s1', enabled: false });
   consoleClient.send({ type: 'madmapperControl', surface: 'T3-s2', enabled: true });
   await waitUntil(() => site.oscLog.length === 2);
-  assert.deepEqual(site.oscLog.map(({ address }) => address), ['/surfaces/T3-s1/opacity', '/surfaces/T3-s2/opacity']);
+  assert.deepEqual(site.oscLog.map(({ address }) => address), ['/surfaces/S1/T3-S1/opacity', '/surfaces/S2/T3-S2/opacity']);
   assert.equal(site.server.getState().profiles.s1.surfaceStates['T3-s1'], false);
   assert.equal(site.server.getState().profiles.s2.surfaceStates['T3-s2'], true);
   const update = await other.waitFor((m) => m.type === 'madmapperStatusUpdate' && m.surface === 'T3-s1');
@@ -282,7 +283,7 @@ test('the console sees the switches of both profiles and the lights', async (t) 
   const consoleClient = await site.connectConsole();
 
   const { state } = await consoleClient.waitFor((m) => m.type === 'systemStateUpdate');
-  for (const name of ['Main-s1', 'T5-s1', 'Main-s2', 'Ground-s2', 'Light1']) {
+  for (const name of ['Main-s1', 'T5-s1', 'Light3-s1', 'Main-s2', 'Ground-s2', 'Light1-s2']) {
     assert.equal(typeof state.surfaceStates[name], 'boolean', name);
   }
 });
@@ -294,11 +295,14 @@ test('on start the server sends every saved area and light switch to MadMapper o
   });
 
   const sent = new Map(site.oscLog.map(({ address, args }) => [address, args[0].value]));
-  assert.equal(site.oscLog.length, 6 + 6 + 3);
-  assert.equal(sent.get('/surfaces/Main-s1/opacity'), 1);
-  assert.equal(sent.get('/surfaces/T2-s1/opacity'), 0);
-  assert.equal(sent.get('/surfaces/Main-s2/opacity'), 0);
-  assert.equal(sent.get('/surfaces/Light2/opacity'), 1);
+  assert.equal(site.oscLog.length, (6 + 3) * 2);
+  assert.equal(sent.get('/surfaces/S1/Main-S1/opacity'), 1);
+  assert.equal(sent.get('/surfaces/S1/T2-S1/opacity'), 0);
+  assert.equal(sent.get('/surfaces/S2/Main-S2/opacity'), 0);
+  // 舊狀態檔共用的 Light2 帶到兩個版本各自的 2 號燈。
+  assert.equal(sent.get('/surfaces/S1/Light2-S1/opacity'), 1);
+  assert.equal(sent.get('/surfaces/S2/Light2-S2/opacity'), 1);
+  assert.equal(sent.get('/surfaces/S2/Light1-S2/opacity'), 0);
 
   site.oscLog.length = 0;
   site.agent.start();

@@ -35,6 +35,9 @@ function createValidConfig() {
           { name: 'Main-1', group: '模式一', oscAddress: '/surfaces/Main-1', defaultOn: true },
           { name: 'Main-2', group: '模式二', oscAddress: '/surfaces/Main-2' },
         ],
+        lights: [
+          { name: 'Light1-s1', oscAddress: '/surfaces/S1/Light1-S1' },
+        ],
       },
       s2: {
         areas: [
@@ -45,13 +48,12 @@ function createValidConfig() {
           { name: 'T4', oscAddress: '/surfaces/T4' },
           { name: 'Ground', oscAddress: '/surfaces/Ground' },
         ],
+        lights: [
+          { name: 'Light1-s2', oscAddress: '/surfaces/S2/Light1-S2' },
+          { name: 'Light2-s2', oscAddress: '/surfaces/S2/Light2-S2' },
+        ],
       },
     },
-    lights: [
-      { name: 'Light1', oscAddress: '/surfaces/Light1' },
-      { name: 'Light2', oscAddress: '/surfaces/Light2' },
-      { name: 'Light3', oscAddress: '/surfaces/Light3' },
-    ],
   };
 }
 
@@ -108,14 +110,29 @@ test('validateMadmapperConfig returns connection settings and per-profile lookup
   assert.equal(result.profiles.s2.areaMap.Main.oscAddress, '/surfaces/Main');
 });
 
-test('validateMadmapperConfig builds one target map per profile with the lights in each', () => {
+test('validateMadmapperConfig builds one target map per profile with its own lights', () => {
   const { profiles } = validateMadmapperConfig(createValidConfig());
 
   assert.ok(profiles.s1.targetMap['Main-1']);
-  assert.ok(profiles.s1.targetMap.Light1, 'work lights are reachable from every profile');
-  assert.ok(profiles.s2.targetMap.Light1);
+  assert.ok(profiles.s1.targetMap['Light1-s1']);
+  assert.ok(profiles.s2.targetMap['Light2-s2']);
+  assert.equal(profiles.s1.targetMap['Light1-s2'], undefined);
   assert.equal(profiles.s2.targetMap['Main-1'], undefined);
   assert.equal(profiles.s1.targetMap.Main, undefined);
+  assert.deepEqual(profiles.s2.lights.map(({ name }) => name), ['Light1-s2', 'Light2-s2']);
+});
+
+test('a profile without lights is valid', () => {
+  const config = createValidConfig();
+  delete config.profiles.s1.lights;
+  assert.deepEqual(validateMadmapperConfig(config).profiles.s1.lights, []);
+});
+
+// 舊格式的頂層 lights（兩版共用）不做靜默相容：工作燈改成每版各自的 OSC 位址。
+test('validateMadmapperConfig rejects the old shared top-level lights', () => {
+  const config = createValidConfig();
+  config.lights = [{ name: 'Light1', oscAddress: '/surfaces/Light1' }];
+  assert.throws(() => validateMadmapperConfig(config), /profiles\.<id>\.lights/);
 });
 
 test('validateMadmapperConfig keeps optional group and defaultOn', () => {
@@ -191,13 +208,13 @@ test('validateMadmapperConfig rejects an area name used by two profiles', () => 
   );
 });
 
-test('validateMadmapperConfig rejects an area that reuses a work light name', () => {
+test('validateMadmapperConfig rejects a name used twice, even across profiles and lights', () => {
   const config = createValidConfig();
-  config.profiles.s2.areas.push({ name: 'Light1', oscAddress: '/surfaces/Light1b' });
+  config.profiles.s2.areas.push({ name: 'Light1-s1', oscAddress: '/surfaces/Light1b' });
 
   assert.throws(
     () => validateMadmapperConfig(config),
-    /duplicate.*Light1|Light1.*duplicate/i,
+    /duplicate.*Light1-s1|Light1-s1.*duplicate/i,
   );
 });
 
