@@ -6,15 +6,16 @@ const assert = require('node:assert/strict');
 const { validateMadmapperConfig } = require('../control-model');
 
 // 現場 MadMapper 的 OSC 位址是 /surfaces/<版本>/<名稱>-<版本>/opacity（2026-10 起），
-// 例如 /surfaces/S1/Main-S1/opacity。位址必須一字不差，否則按了沒反應而且沒有錯誤。
+// 資料夾那層的版本是大寫（S1），名稱尾碼的版本是小寫（s1），例如 /surfaces/S1/Main-s1/opacity
+// （d997551 把尾碼改成小寫，現場負責人確認小寫才對）。位址必須一字不差，否則按了沒反應而且沒有錯誤。
 // name 是狀態檔與控制台指令用的 key（小寫版本代號），label 是按鈕上的字。
 const expectedTargets = (profileId, labels) => labels.map((label) => {
   const tag = profileId.toUpperCase();
-  return { name: `${label}-${profileId}`, label, oscAddress: `/surfaces/${tag}/${label}-${tag}/opacity` };
+  return { name: `${label}-${profileId}`, label, oscAddress: `/surfaces/${tag}/${label}-${profileId}/opacity` };
 });
 const lightTargets = (profileId) => [1, 2, 3].map((n) => {
   const tag = profileId.toUpperCase();
-  return { name: `Light${n}-${profileId}`, label: `工作燈 ${n}`, oscAddress: `/surfaces/${tag}/Light${n}-${tag}/opacity` };
+  return { name: `Light${n}-${profileId}`, label: `工作燈 ${n}`, oscAddress: `/surfaces/${tag}/Light${n}-${profileId}/opacity` };
 });
 const pick = (targets) => targets.map(({ name, label, oscAddress }) => ({ name, label, oscAddress }));
 

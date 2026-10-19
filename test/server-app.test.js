@@ -162,9 +162,9 @@ test('switching to s1 gives the s1 room six console-order seats and binds MadMap
 
   // 結束時 MadMapper 只剩 s1：s1 區域照存檔（預設全開），s2 的區域與工作燈全關。
   const last = new Map(site.oscLog.map(({ address, args }) => [address, args[0].value]));
-  assert.equal(last.get('/surfaces/S1/Main-S1/opacity'), 1);
-  assert.equal(last.get('/surfaces/S2/Main-S2/opacity'), 0);
-  assert.equal(last.get('/surfaces/S2/Light1-S2/opacity'), 0);
+  assert.equal(last.get('/surfaces/S1/Main-s1/opacity'), 1);
+  assert.equal(last.get('/surfaces/S2/Main-s2/opacity'), 0);
+  assert.equal(last.get('/surfaces/S2/Light1-s2/opacity'), 0);
   assert.equal(site.server.getState().profiles.s2.tableModes[0], 1, 's2 keeps its own seats');
 });
 
@@ -255,7 +255,7 @@ test('Unity commands and areas are rejected while switching, the target lights s
   consoleClient.clear();
   consoleClient.send({ type: 'madmapperControl', surface: 'Light1-s1', enabled: true });
   await waitUntil(() => site.oscLog.length === 1);
-  assert.deepEqual(site.oscLog.map(({ address, args }) => [address, args[0].value]), [['/surfaces/S1/Light1-S1/opacity', 1]]);
+  assert.deepEqual(site.oscLog.map(({ address, args }) => [address, args[0].value]), [['/surfaces/S1/Light1-s1/opacity', 1]]);
   assert.equal(site.server.getState().profiles.s1.lightStates['Light1-s1'], true);
 
   consoleClient.send({ type: 'madmapperControl', surface: 'Light1-s2', enabled: true });
@@ -273,7 +273,7 @@ test('only the active profile areas and lights can be toggled', async (t) => {
   consoleClient.send({ type: 'madmapperControl', surface: 'T3-s2', enabled: true });
   consoleClient.send({ type: 'madmapperControl', surface: 'Light2-s2', enabled: true });
   await waitUntil(() => site.oscLog.length === 2);
-  assert.deepEqual(site.oscLog.map(({ address }) => address), ['/surfaces/S2/T3-S2/opacity', '/surfaces/S2/Light2-S2/opacity']);
+  assert.deepEqual(site.oscLog.map(({ address }) => address), ['/surfaces/S2/T3-s2/opacity', '/surfaces/S2/Light2-s2/opacity']);
   assert.equal(site.server.getState().profiles.s2.surfaceStates['T3-s2'], true);
   assert.equal(site.server.getState().profiles.s2.lightStates['Light2-s2'], true);
   const update = await other.waitFor((m) => m.type === 'madmapperStatusUpdate' && m.surface === 'T3-s2');
@@ -306,12 +306,12 @@ test('on start the server turns the other profile off and the active one on as s
 
   const sent = new Map(site.oscLog.map(({ address, args }) => [address, args[0].value]));
   assert.equal(site.oscLog.length, (6 + 3) * 2);
-  assert.equal(sent.get('/surfaces/S1/Main-S1/opacity'), 0, 's1 is not active, so it is off');
-  assert.equal(sent.get('/surfaces/S2/Main-S2/opacity'), 0, 's2 areas default to off');
+  assert.equal(sent.get('/surfaces/S1/Main-s1/opacity'), 0, 's1 is not active, so it is off');
+  assert.equal(sent.get('/surfaces/S2/Main-s2/opacity'), 0, 's2 areas default to off');
   // 舊狀態檔共用的 Light2 帶到兩個版本各自的 2 號燈；只有目前方案的會亮。
-  assert.equal(sent.get('/surfaces/S1/Light2-S1/opacity'), 0);
-  assert.equal(sent.get('/surfaces/S2/Light2-S2/opacity'), 1);
-  assert.equal(sent.get('/surfaces/S2/Light1-S2/opacity'), 0);
+  assert.equal(sent.get('/surfaces/S1/Light2-s1/opacity'), 0);
+  assert.equal(sent.get('/surfaces/S2/Light2-s2/opacity'), 1);
+  assert.equal(sent.get('/surfaces/S2/Light1-s2/opacity'), 0);
   assert.equal(site.server.getState().profiles.s1.lightStates['Light2-s1'], true, 'the s1 switch is kept for later');
 
   site.oscLog.length = 0;
@@ -319,7 +319,7 @@ test('on start the server turns the other profile off and the active one on as s
   await waitUntil(() => site.server.getRooms().length === 2);
   await waitUntil(() => site.oscLog.length === (6 + 3) * 2);
   const aligned = new Map(site.oscLog.map(({ address, args }) => [address, args[0].value]));
-  assert.equal(aligned.get('/surfaces/S1/Main-S1/opacity'), 0, 'the agent connecting aligns MadMapper again');
+  assert.equal(aligned.get('/surfaces/S1/Main-s1/opacity'), 0, 'the agent connecting aligns MadMapper again');
 });
 
 test('a server restarted mid-switch keeps the areas dark', async (t) => {
@@ -328,8 +328,8 @@ test('a server restarted mid-switch keeps the areas dark', async (t) => {
   });
 
   const sent = new Map(site.oscLog.map(({ address, args }) => [address, args[0].value]));
-  assert.equal(sent.get('/surfaces/S1/Main-S1/opacity'), 0);
-  assert.equal(sent.get('/surfaces/S2/Main-S2/opacity'), 0);
+  assert.equal(sent.get('/surfaces/S1/Main-s1/opacity'), 0);
+  assert.equal(sent.get('/surfaces/S2/Main-s2/opacity'), 0);
 });
 
 // 遮罩跟著方案走：第一版用追蹤端的 1 號遮罩、第二版用 2 號（profiles.config.json 的 maskId）。
