@@ -13,7 +13,9 @@ const expectedTargets = (profileId, labels) => labels.map((label) => {
   const tag = profileId.toUpperCase();
   return { name: `${label}-${profileId}`, label, oscAddress: `/surfaces/${tag}/${label}-${profileId}/opacity` };
 });
-const lightTargets = (profileId) => [1, 2, 3].map((n) => {
+// 第一版四盞工作燈，第二版三盞。
+const LIGHT_COUNTS = { s1: 4, s2: 3 };
+const lightTargets = (profileId) => Array.from({ length: LIGHT_COUNTS[profileId] }, (_, i) => i + 1).map((n) => {
   const tag = profileId.toUpperCase();
   return { name: `Light${n}-${profileId}`, label: `工作燈 ${n}`, oscAddress: `/surfaces/${tag}/Light${n}-${profileId}/opacity` };
 });
@@ -34,7 +36,7 @@ test('s2 has its six surfaces under the /surfaces/S2/ addresses', () => {
   assert.deepEqual(pick(validated.profiles.s2.areas), expectedTargets('s2', ['Main', 'T1', 'T2', 'T3', 'T4', 'Ground']));
 });
 
-test('each profile has its own three work lights, off by default', () => {
+test('each profile has its own work lights (s1 four, s2 three), off by default', () => {
   const validated = validateMadmapperConfig(require('../madmapper.config.json'));
 
   for (const profileId of ['s1', 's2']) {

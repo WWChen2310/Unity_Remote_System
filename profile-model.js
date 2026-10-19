@@ -375,7 +375,7 @@ function migrateSystemState(raw, { profiles, madmapper }) {
  * 把控制台順序的座位（index 0 = 座位 1）轉成這個 build 要的陣列。
  * 長度是 profile.seatCount；s1 的 Unity 接受 1–8 格，順序由 profile.seatOrder 決定：
  * direct 座位 1 → Region 0，reversed 座位 1 → Region seatCount - 1（2026-03 版的舊順序）。
- * s1 現在是 6 席 direct；控制台存的 9 格裡超出 seatCount 的部分不送。
+ * s1 是 8 席 reversed（現場確認控制台座位 1 = Unity 座位 8）；控制台存的 9 格裡超出 seatCount 的部分不送。
  */
 function toUnityTableModes(profile, stored) {
   const source = Array.isArray(stored) ? stored : [];

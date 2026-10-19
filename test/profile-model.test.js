@@ -138,7 +138,7 @@ test('migrateSystemState moves a v2 file into profiles.s2 and seeds s1 defaults'
   assert.equal('Light1' in state.profiles.s2.surfaceStates, false);
   // 舊版工作燈兩版共用；現在每版各自一組，舊的開關帶到兩版同編號的燈。
   assert.deepEqual(state.profiles.s2.lightStates, { 'Light1-s2': true, 'Light2-s2': false, 'Light3-s2': false });
-  assert.deepEqual(state.profiles.s1.lightStates, { 'Light1-s1': true, 'Light2-s1': false, 'Light3-s1': false });
+  assert.deepEqual(state.profiles.s1.lightStates, { 'Light1-s1': true, 'Light2-s1': false, 'Light3-s1': false, 'Light4-s1': false });
   assert.equal('lightStates' in state, false, 'no shared light state is kept');
 
   assert.equal(state.profiles.s1.groundThemeId, 'none');
@@ -265,35 +265,35 @@ test('toUnityTableModes passes nine direct seats through for s2', () => {
   assert.deepEqual(toUnityTableModes(byId.s2, [1, 2, 3, 4, 0, 0, 0, 0, 1]), [1, 2, 3, 4, 0, 0, 0, 0, 1]);
 });
 
-test('s1 sends six seats in console order', () => {
+test('s1 sends eight seats in reversed order', () => {
   const { byId } = viewContext();
 
-  // s1 的席位重做成 6 席，座位 1 = Region 0，不再反轉；第 7 格以後不送。
-  assert.deepEqual(toUnityTableModes(byId.s1, [1, 2, 3, 0, 1, 2, 0, 0, 0]), [1, 2, 3, 0, 1, 2]);
+  // s1 現場重做的版面仍是 8 席，控制台座位 1 = Unity 座位 8（Region 7）、座位 2 = Region 6 …；第 9 格不送。
+  assert.deepEqual(toUnityTableModes(byId.s1, [1, 2, 3, 0, 1, 2, 0, 3, 0]), [3, 0, 2, 1, 0, 3, 2, 1]);
 });
 
 test('toUnityTableModes drops lights-on for s1', () => {
   const { byId } = viewContext();
 
   // s1 沒有開燈（4），不認得的值一律當 0。
-  assert.deepEqual(toUnityTableModes(byId.s1, [1, 4, 3, 4, 0, 2, 0, 0, 4]), [1, 0, 3, 0, 0, 2]);
+  assert.deepEqual(toUnityTableModes(byId.s1, [1, 4, 3, 4, 0, 2, 0, 0, 4]), [0, 0, 2, 0, 0, 3, 0, 1]);
 });
 
-test('toUnityTableModes still reverses when a profile asks for the reversed order', () => {
+test('toUnityTableModes keeps console order when a profile asks for direct', () => {
   const { byId } = viewContext();
-  const reversedEight = { ...byId.s1, seatCount: 8, seatOrder: 'reversed' };
+  const directSix = { ...byId.s1, seatCount: 6, seatOrder: 'direct' };
 
-  // 反轉順序仍是設定檔的合法選項（2026-03 版）：座位 1 → Region 7、座位 2 → Region 6 …
-  assert.deepEqual(toUnityTableModes(reversedEight, [1, 2, 3, 0, 0, 0, 0, 0, 2]), [0, 0, 0, 0, 0, 3, 2, 1]);
+  // direct 仍是設定檔的合法選項：座位 1 → Region 0；超出 seatCount 的不送。
+  assert.deepEqual(toUnityTableModes(directSix, [1, 2, 3, 0, 1, 2, 0, 0, 0]), [1, 2, 3, 0, 1, 2]);
 });
 
 test('toUnityTableModes treats a missing array as all zeros', () => {
   const { byId } = viewContext();
 
-  assert.deepEqual(toUnityTableModes(byId.s1, undefined), [0, 0, 0, 0, 0, 0]);
+  assert.deepEqual(toUnityTableModes(byId.s1, undefined), [0, 0, 0, 0, 0, 0, 0, 0]);
 });
 
-test('createRoomState sends s1 six console-order seats and no ground theme', () => {
+test('createRoomState sends s1 eight reversed seats and no ground theme', () => {
   const { state, byId } = viewContext();
   state.profiles.s1.contentMode = 8;
   state.profiles.s1.tableModes[0] = 1;
@@ -303,7 +303,7 @@ test('createRoomState sends s1 six console-order seats and no ground theme', () 
   assert.deepEqual(room, {
     contentMode: 8,
     maskMode: 1,
-    tableModes: [1, 0, 0, 0, 0, 0],
+    tableModes: [0, 0, 0, 0, 0, 0, 0, 1],
     logo: { ...DEFAULT_LOGO },
   });
 });
@@ -337,7 +337,7 @@ test('createConsoleState exposes the areas of every profile plus the work lights
   assert.equal(view.switch.status, 'idle');
   assert.deepEqual(view.profileCatalog.map(({ id }) => id), ['s1', 's2']);
   assert.deepEqual(view.profileCatalog[0].areas[0], { name: 'Main-s1', label: 'Main', group: null });
-  assert.equal(view.profileCatalog[0].seatCount, 6);
+  assert.equal(view.profileCatalog[0].seatCount, 8);
   assert.deepEqual(view.profileCatalog[0].seatModeLabels, { 0: '預設' });
   assert.equal(view.profileCatalog[1].ground, true);
 });

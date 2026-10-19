@@ -152,12 +152,12 @@ test('switching to s1 gives the s1 room six console-order seats and binds MadMap
   consoleClient.send({ type: 'switchProfile', profileId: 's1' });
 
   const done = await consoleClient.waitFor(isIdleOn('s1'));
-  assert.equal(done.state.profileCatalog.find(({ id }) => id === 's1').seatCount, 6);
+  assert.equal(done.state.profileCatalog.find(({ id }) => id === 's1').seatCount, 8);
   assert.equal(done.state.tableModes[0], 0, 'the s2 seat change does not leak into s1');
 
   const s1Room = site.agent.rooms('s1')[0];
-  const roomState = await s1Room.waitFor((m) => m.type === 'systemStateUpdate' && m.state.tableModes.length === 6);
-  assert.deepEqual(roomState.state.tableModes, [0, 0, 0, 0, 0, 0]);
+  const roomState = await s1Room.waitFor((m) => m.type === 'systemStateUpdate' && m.state.tableModes.length === 8);
+  assert.deepEqual(roomState.state.tableModes, [0, 0, 0, 0, 0, 0, 0, 0]);
   assert.equal('groundThemeId' in roomState.state, false);
 
   // 結束時 MadMapper 只剩 s1：s1 區域照存檔（預設全開），s2 的區域與工作燈全關。
@@ -168,7 +168,7 @@ test('switching to s1 gives the s1 room six console-order seats and binds MadMap
   assert.equal(site.server.getState().profiles.s2.tableModes[0], 1, 's2 keeps its own seats');
 });
 
-test('a seat change in s1 reaches the s1 room at the same index as the console', async (t) => {
+test('a seat change in s1 reaches the s1 room at the mirrored index', async (t) => {
   const site = await startAndSettle(t);
   const consoleClient = await site.connectConsole();
   consoleClient.send({ type: 'switchProfile', profileId: 's1' });
@@ -180,7 +180,7 @@ test('a seat change in s1 reaches the s1 room at the same index as the console',
   consoleClient.send({ type: 'updateTableMode', tableIndex: 0, mode: 1 });
 
   const update = await s1Room.waitFor((m) => m.type === 'tableModeUpdate');
-  assert.deepEqual(update.tableModes, [1, 0, 0, 0, 0, 0]);
+  assert.deepEqual(update.tableModes, [0, 0, 0, 0, 0, 0, 0, 1]);
   const consoleUpdate = await consoleClient.waitFor((m) => m.type === 'tableModeUpdate');
   assert.deepEqual(consoleUpdate.tableModes, [1, 0, 0, 0, 0, 0, 0, 0, 0]);
 });
@@ -202,13 +202,10 @@ test('s1 rejects seats outside split mode, lights-on and ground themes', async (
   consoleClient.send({ type: 'updateTableMode', tableIndex: 0, mode: 4 });
   assert.equal((await consoleClient.waitFor((m) => m.type === 'commandRejected')).reason, 'seatOutOfRange');
 
-  consoleClient.clear();
-  consoleClient.send({ type: 'updateTableMode', tableIndex: 6, mode: 1 });
-  assert.equal((await consoleClient.waitFor((m) => m.type === 'commandRejected')).reason, 'seatOutOfRange', 's1 has six seats, so seat 7 is out of range');
 
   consoleClient.clear();
   consoleClient.send({ type: 'updateTableMode', tableIndex: 8, mode: 1 });
-  assert.equal((await consoleClient.waitFor((m) => m.type === 'commandRejected')).reason, 'seatOutOfRange');
+  assert.equal((await consoleClient.waitFor((m) => m.type === 'commandRejected')).reason, 'seatOutOfRange', 's1 has eight seats, so seat 9 is out of range');
 
   consoleClient.clear();
   consoleClient.send({ type: 'switchGroundTheme', groundThemeId: 'crops' });
@@ -305,7 +302,8 @@ test('on start the server turns the other profile off and the active one on as s
   });
 
   const sent = new Map(site.oscLog.map(({ address, args }) => [address, args[0].value]));
-  assert.equal(site.oscLog.length, (6 + 3) * 2);
+  // s1：6 區域 + 4 盞燈；s2：6 區域 + 3 盞燈。
+  assert.equal(site.oscLog.length, (6 + 4) + (6 + 3));
   assert.equal(sent.get('/surfaces/S1/Main-s1/opacity'), 0, 's1 is not active, so it is off');
   assert.equal(sent.get('/surfaces/S2/Main-s2/opacity'), 0, 's2 areas default to off');
   // 舊狀態檔共用的 Light2 帶到兩個版本各自的 2 號燈；只有目前方案的會亮。
@@ -317,7 +315,7 @@ test('on start the server turns the other profile off and the active one on as s
   site.oscLog.length = 0;
   site.agent.start();
   await waitUntil(() => site.server.getRooms().length === 2);
-  await waitUntil(() => site.oscLog.length === (6 + 3) * 2);
+  await waitUntil(() => site.oscLog.length === (6 + 4) + (6 + 3));
   const aligned = new Map(site.oscLog.map(({ address, args }) => [address, args[0].value]));
   assert.equal(aligned.get('/surfaces/S1/Main-s1/opacity'), 0, 'the agent connecting aligns MadMapper again');
 });

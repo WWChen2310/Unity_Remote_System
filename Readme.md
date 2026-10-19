@@ -7,7 +7,7 @@
 - 區域與工作燈都依投影方案分組：區域寫在 `profiles.<id>.areas`，工作燈寫在 `profiles.<id>.lights`（2026-10 起每版各自一組，預設各三盞）。舊格式（頂層 `areas` 或頂層 `lights`）會讓伺服器拒絕啟動，請改成新格式。
 - 每個區域與工作燈有三個欄位：`name` 是狀態檔與控制台指令用的 key（例如 `Main-s1`，跨版本不可重複，不要隨意改名），`label` 是控制台按鈕上的字，`oscAddress` 是實際送給 MadMapper 的位址。
 - MadMapper 的位址格式為 `/surfaces/<版本>/<名稱>-<版本>/opacity`，資料夾那層的版本為大寫 `S1`、`S2`，名稱尾碼的版本為小寫 `s1`、`s2`（與 `name` 一致），例如 `/surfaces/S1/Main-s1/opacity`、`/surfaces/S2/Main-s2/opacity`、`/surfaces/S1/Light1-s1/opacity`。完整 `oscAddress` 字串皆可依 MadMapper 實際命名修改（在 MadMapper 右鍵 Copy OSC Address 對照）。
-- 第一版（2026-03，內部代號 s1）：區域 `Main-s1`、`T1-s1`～`T5-s1`（控制台顯示 `Main`、`T1`～`T5`，預設開啟，不分組），工作燈 `Light1-s1`～`Light3-s1`。
+- 第一版（2026-03，內部代號 s1）：區域 `Main-s1`、`T1-s1`～`T5-s1`（控制台顯示 `Main`、`T1`～`T5`，預設開啟，不分組），工作燈 `Light1-s1`～`Light4-s1`（第一版四盞，第二版三盞）。
 - 第二版（2026-07，內部代號 s2）：區域依序為 `Main-s2`、`T1-s2`、`T2-s2`、`T3-s2`、`T4-s2`、`Ground-s2`（控制台顯示 `Main`、`T1`、`T2`、`T3`、`T4`、`Ground`），工作燈 `Light1-s2`～`Light3-s2`。
 - 舊狀態檔的遷移：2026-10 以前區域用短名稱 `Main`、`T1`… 當 key，Node 讀到時沿用到第二版的新名稱；第一版舊的 `Main-1`… 無法對應，回到預設的開啟。工作燈以前兩版共用（`Light1`…），讀到時把開關帶到兩個版本同編號的燈。
 - 首次啟動可執行 `npm start`（等同 `node integrated-server.js`）。修改 JSON 後必須重啟 Node：使用 PM2 時執行 `pm2 restart <應用程式名稱>`；直接啟動時先停止舊程序，再重新執行啟動指令。
@@ -15,8 +15,8 @@
 
 ## Unity 九座位設定（第二版）
 
-- 本節描述第二版。第一版為 6 席，順序與控制台相同（座位 1 → Region 0，`seatOrder: "direct"`），Node 只送前 6 格；第一版的 Unity 接受 1–8 格的座位陣列，不需設定。
-- 第一版改成 6 席的部署順序：**先**換上新的第一版 Unity build，在現場用 `F6` 版面調整存好新座位，**再**部署本專案（`profiles.s1.seatCount: 6`、`seatOrder: "direct"`）並重啟 Node。只換 Node、Unity 仍是 3/26 的 8 席版面時，`direct` 會讓座位編號左右鏡像。之後在 Unity 增減座位，只要把 `profiles.s1.seatCount` 改成相同的席數再重啟 Node。
+- 本節描述第二版。第一版為 8 席、順序反轉（控制台座位 1 → Unity 座位 8 = Region 7，座位 2 → Region 6 …，`seatOrder: "reversed"`），Node 送 8 格；第一版的 Unity 接受 1–8 格的座位陣列，不需設定。
+- 第一版座位在現場用 Unity 的 `F6` 版面調整重建（存在 Unity 主機的 `s1-layout.json`），Node 的 `profiles.s1` 只決定席數與順序。之後在 Unity 增減座位，要把 `profiles.s1.seatCount` 改成相同的席數再重啟 Node；若控制台編號和投影上的座位對不上，改 `seatOrder`（`direct` 或 `reversed`），或在 Unity 用 `Ctrl+[`／`Ctrl+]` 調換編號。
 - Unity 實際控制檔位於 `Assets/Script/Singleton/UnityModeController.cs`，其 `SeatCount = 9`。
 - WebSocket 的直接座位對應為 `Seat1` → `0`、`Seat2` → `1`、`Seat3` → `2`、`Seat4` → `3`、`Seat5` → `4`、`Seat6` → `5`、`Seat7` → `6`、`Seat8` → `7`、`Seat9` → `8`。
 - 在 `RegionManager` 新增 `Region ID 8`，並在 `CloudMaterials` 加入第九個材質，也就是 `CloudMaterials[8]`。
@@ -36,7 +36,7 @@ Web 伺服器必須同時部署 `interface/console.html` 與 `interface/control-
 
 控制台以 iPad 為主要操作裝置，分為「內容播放、座位控制、投影與燈光、Logo 疊圖、循環與資訊」五個標籤頁。每頁卡片依序排列，避免不同高度的卡片造成大片留白；座位面板在平板每列兩席，手機每列一席。支援直向、橫向與頁面縮放，主要按鈕至少 44px 高。上方持續顯示目前狀態與版本選擇，版本規則可展開查看。標籤切換只改變顯示頁面，不改變播放或方案；開啟頁面時沿用伺服器目前方案。
 
-- 第一版（s1）：6 席，只有「分割內容」可操作座位，狀態為預設／海洋／森林／液態食物；不顯示獨立地面控制，投影區域為 Main、T1～T5 六個。
+- 第一版（s1）：8 席，只有「分割內容」可操作座位，狀態為預設／海洋／森林／液態食物；不顯示獨立地面控制，投影區域為 Main、T1～T5 六個。
 - 第二版（s2）：9 席，座位增加關燈／開燈，稻田／水草背景下停用座位效果；地面內容可獨立切換。
 - 各版本分別保存背景、座位、投影區域與工作燈；物件追蹤遮罩跟著版本自動切換；Logo 兩版共用。切換期間目前版本的工作燈與 Logo 仍可操作。
 

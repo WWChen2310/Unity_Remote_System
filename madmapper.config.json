@@ -15,7 +15,8 @@
       "lights": [
         { "name": "Light1-s1", "label": "工作燈 1", "oscAddress": "/surfaces/S1/Light1-s1/opacity" },
         { "name": "Light2-s1", "label": "工作燈 2", "oscAddress": "/surfaces/S1/Light2-s1/opacity" },
-        { "name": "Light3-s1", "label": "工作燈 3", "oscAddress": "/surfaces/S1/Light3-s1/opacity" }
+        { "name": "Light3-s1", "label": "工作燈 3", "oscAddress": "/surfaces/S1/Light3-s1/opacity" },
+        { "name": "Light4-s1", "label": "工作燈 4", "oscAddress": "/surfaces/S1/Light4-s1/opacity" }
       ]
     },
     "s2": {
