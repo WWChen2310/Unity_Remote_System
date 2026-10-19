@@ -120,10 +120,11 @@ const s1Initial = {
   },
 };
 
-// MadMapper 跟著方案：熄掉全部區域與另一版的工作燈，目標方案就緒後恢復它存檔的區域。
-test('switching blacks out every area and the other profile, then restores the target areas', async () => {
+// MadMapper 跟著方案：熄掉全部區域與另一版的工作燈，目標方案就緒後打開它全部的區域。
+// 切到另一版時，目標方案的區域與工作燈一律全開（不沿用上次存檔），另一版存檔不動。
+test('switching blacks out every area and the other profile, then turns on every target area', async () => {
   const { switcher, log, getState } = createHarness({ initial: s1Initial });
-  const before = JSON.stringify(getState().profiles);
+  const otherBefore = JSON.stringify(getState().profiles.s2);
 
   await switcher.switchTo('s1');
   const { before: blackout, after: restore } = oscPhases(log);
@@ -136,14 +137,33 @@ test('switching blacks out every area and the other profile, then restores the t
   for (const { name } of madmapper.profiles.s2.lights) {
     assert.equal(blackout[addressOf(name)], 0, `${name} of the old profile is off`);
   }
-  assert.equal(blackout[addressOf('Light1-s1')], 1, 'target lights stay as saved during the switch');
-  assert.equal(blackout[addressOf('Light2-s1')], 0);
+  for (const { name } of madmapper.profiles.s1.lights) {
+    assert.equal(blackout[addressOf(name)], 1, `target light ${name} is on during the switch`);
+  }
 
-  assert.equal(restore[addressOf('Main-s1')], 1);
-  assert.equal(restore[addressOf('T1-s1')], 0);
+  for (const { name } of madmapper.profiles.s1.areas) {
+    assert.equal(restore[addressOf(name)], 1, `target area ${name} is on after the switch`);
+  }
   assert.equal(restore[addressOf('Main-s2')], 0, 'the other profile stays off');
   assert.equal(restore[addressOf('Light1-s2')], 0);
-  assert.equal(JSON.stringify(getState().profiles), before, 'saved switches are untouched');
+
+  const saved = getState().profiles.s1;
+  assert.ok(Object.values(saved.surfaceStates).every((on) => on === true), 'target areas are saved on');
+  assert.ok(Object.values(saved.lightStates).every((on) => on === true), 'target lights are saved on');
+  assert.equal(JSON.stringify(getState().profiles.s2), otherBefore, 'the other profile keeps its saved switches');
+});
+
+// 重新啟動目前方案（不是換版）沿用操作者存的開關，不強制全開。
+test('restarting the active profile keeps its saved switches', async () => {
+  const { switcher, log, getState } = createHarness({ initial: s1Initial });
+  const before = JSON.stringify(getState().profiles);
+
+  await switcher.restartActive();
+  const { after: restore } = oscPhases(log);
+
+  assert.equal(restore[addressOf('Main-s2')], 1);
+  assert.equal(restore[addressOf('T2-s2')], 0, 'an area saved off stays off');
+  assert.equal(JSON.stringify(getState().profiles), before);
 });
 
 test('a failed switch leaves every area off', async () => {

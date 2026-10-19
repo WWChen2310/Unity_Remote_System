@@ -13,7 +13,7 @@ const SWITCH_STEPS = Object.freeze(['blackout', 'starting', 'waitingForRooms', '
  * 任何一步失敗就停在 failed，區域維持 0，不自動重試：交給操作者決定重試或回到原方案。
  *
  * MadMapper 與方案綁定：只有目前方案的區域與工作燈會亮，其他方案一律關閉（控制台也鎖住）。
- * 目標方案的工作燈在熄燈時就照存檔恢復，切換途中現場仍有照明。
+ * 換到另一版時，目標方案的區域與工作燈存檔先全部設為開；工作燈在熄燈時就打開，切換途中現場仍有照明。
  *
  * activeProfile 在第一步就改成目標：新的 Unity 一連上就會收到狀態，那一刻必須已是目標方案的 view。
  */
@@ -74,6 +74,14 @@ class ProfileSwitcher {
     this.store.update((state) => {
       state.activeProfile = to;
       state.switch = { status: 'switching', from, to, step, startedAt, error: null };
+      // 換到另一版時，該版的投影區域與工作燈一律全開（現場要求），不沿用上次離開時的開關。
+      // 同一版重新啟動（restartActive、失敗後重試）沿用操作者存的開關。
+      if (to !== from) {
+        const { areas, lights } = this.madmapper.profiles[to];
+        const target = state.profiles[to];
+        for (const { name } of areas) target.surfaceStates[name] = true;
+        for (const { name } of lights) target.lightStates[name] = true;
+      }
     });
     this.events.switchChanged();
     this.log(`switching ${from} -> ${to}`);
