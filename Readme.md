@@ -16,6 +16,7 @@
 ## Unity 九座位設定（第二版）
 
 - 本節描述第二版。第一版為 6 席，順序與控制台相同（座位 1 → Region 0，`seatOrder: "direct"`），Node 只送前 6 格；第一版的 Unity 接受 1–8 格的座位陣列，不需設定。
+- 第一版改成 6 席的部署順序：**先**換上新的第一版 Unity build，在現場用 `F6` 版面調整存好新座位，**再**部署本專案（`profiles.s1.seatCount: 6`、`seatOrder: "direct"`）並重啟 Node。只換 Node、Unity 仍是 3/26 的 8 席版面時，`direct` 會讓座位編號左右鏡像。之後在 Unity 增減座位，只要把 `profiles.s1.seatCount` 改成相同的席數再重啟 Node。
 - Unity 實際控制檔位於 `Assets/Script/Singleton/UnityModeController.cs`，其 `SeatCount = 9`。
 - WebSocket 的直接座位對應為 `Seat1` → `0`、`Seat2` → `1`、`Seat3` → `2`、`Seat4` → `3`、`Seat5` → `4`、`Seat6` → `5`、`Seat7` → `6`、`Seat8` → `7`、`Seat9` → `8`。
 - 在 `RegionManager` 新增 `Region ID 8`，並在 `CloudMaterials` 加入第九個材質，也就是 `CloudMaterials[8]`。
