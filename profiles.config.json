@@ -9,8 +9,8 @@
     "s1": {
       "label": "第一版",
       "rooms": ["both"],
-      "seatCount": 8,
-      "seatOrder": "reversed",
+      "seatCount": 6,
+      "seatOrder": "direct",
       "seatModes": [0, 1, 2, 3],
       "seatModeLabels": { "0": "預設" },
       "seatOnlyInModes": [8],

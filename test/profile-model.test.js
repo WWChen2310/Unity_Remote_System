@@ -265,20 +265,35 @@ test('toUnityTableModes passes nine direct seats through for s2', () => {
   assert.deepEqual(toUnityTableModes(byId.s2, [1, 2, 3, 4, 0, 0, 0, 0, 1]), [1, 2, 3, 4, 0, 0, 0, 0, 1]);
 });
 
-test('toUnityTableModes reverses eight seats for s1 and drops lights-on', () => {
+test('s1 sends six seats in console order', () => {
   const { byId } = viewContext();
 
-  // 座位 1 → Region 7、座位 2 → Region 6 …；s1 沒有開燈（4），第 9 格不送。
-  assert.deepEqual(toUnityTableModes(byId.s1, [1, 2, 3, 4, 0, 0, 0, 0, 2]), [0, 0, 0, 0, 0, 3, 2, 1]);
+  // s1 的席位重做成 6 席，座位 1 = Region 0，不再反轉；第 7 格以後不送。
+  assert.deepEqual(toUnityTableModes(byId.s1, [1, 2, 3, 0, 1, 2, 0, 0, 0]), [1, 2, 3, 0, 1, 2]);
+});
+
+test('toUnityTableModes drops lights-on for s1', () => {
+  const { byId } = viewContext();
+
+  // s1 沒有開燈（4），不認得的值一律當 0。
+  assert.deepEqual(toUnityTableModes(byId.s1, [1, 4, 3, 4, 0, 2, 0, 0, 4]), [1, 0, 3, 0, 0, 2]);
+});
+
+test('toUnityTableModes still reverses when a profile asks for the reversed order', () => {
+  const { byId } = viewContext();
+  const reversedEight = { ...byId.s1, seatCount: 8, seatOrder: 'reversed' };
+
+  // 反轉順序仍是設定檔的合法選項（2026-03 版）：座位 1 → Region 7、座位 2 → Region 6 …
+  assert.deepEqual(toUnityTableModes(reversedEight, [1, 2, 3, 0, 0, 0, 0, 0, 2]), [0, 0, 0, 0, 0, 3, 2, 1]);
 });
 
 test('toUnityTableModes treats a missing array as all zeros', () => {
   const { byId } = viewContext();
 
-  assert.deepEqual(toUnityTableModes(byId.s1, undefined), [0, 0, 0, 0, 0, 0, 0, 0]);
+  assert.deepEqual(toUnityTableModes(byId.s1, undefined), [0, 0, 0, 0, 0, 0]);
 });
 
-test('createRoomState sends s1 eight translated seats and no ground theme', () => {
+test('createRoomState sends s1 six console-order seats and no ground theme', () => {
   const { state, byId } = viewContext();
   state.profiles.s1.contentMode = 8;
   state.profiles.s1.tableModes[0] = 1;
@@ -288,7 +303,7 @@ test('createRoomState sends s1 eight translated seats and no ground theme', () =
   assert.deepEqual(room, {
     contentMode: 8,
     maskMode: 1,
-    tableModes: [0, 0, 0, 0, 0, 0, 0, 1],
+    tableModes: [1, 0, 0, 0, 0, 0],
     logo: { ...DEFAULT_LOGO },
   });
 });
@@ -322,7 +337,7 @@ test('createConsoleState exposes the areas of every profile plus the work lights
   assert.equal(view.switch.status, 'idle');
   assert.deepEqual(view.profileCatalog.map(({ id }) => id), ['s1', 's2']);
   assert.deepEqual(view.profileCatalog[0].areas[0], { name: 'Main-s1', label: 'Main', group: null });
-  assert.equal(view.profileCatalog[0].seatCount, 8);
+  assert.equal(view.profileCatalog[0].seatCount, 6);
   assert.deepEqual(view.profileCatalog[0].seatModeLabels, { 0: '預設' });
   assert.equal(view.profileCatalog[1].ground, true);
 });

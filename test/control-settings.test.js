@@ -18,7 +18,7 @@ test('profile descriptions follow deployed seat and ground capabilities', () => 
   const describe = id => describeProfile({ id, ...profiles[id], areas: madmapper.profiles[id].areas }, { 4: '稻田', 5: '水草', 8: '星空' });
   assert.deepEqual(describe('s1'), {
     title: '第一版',
-    summary: '8 席 · 無獨立地面 · 6 個投影區域',
+    summary: '6 席 · 無獨立地面 · 6 個投影區域',
     seatRule: '僅在「分割內容」可調整座位'
   });
   assert.deepEqual(describe('s2'), {

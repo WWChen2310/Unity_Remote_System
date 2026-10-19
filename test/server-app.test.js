@@ -142,7 +142,7 @@ test('the agent connecting starts the active profile and its rooms get room view
   assert.deepEqual(Object.keys(roomState.state).sort(), ['contentMode', 'groundThemeId', 'logo', 'maskMode', 'tableModes']);
 });
 
-test('switching to s1 gives the s1 room eight reversed seats and binds MadMapper to s1', async (t) => {
+test('switching to s1 gives the s1 room six console-order seats and binds MadMapper to s1', async (t) => {
   const site = await startAndSettle(t);
   const consoleClient = await site.connectConsole();
 
@@ -152,12 +152,12 @@ test('switching to s1 gives the s1 room eight reversed seats and binds MadMapper
   consoleClient.send({ type: 'switchProfile', profileId: 's1' });
 
   const done = await consoleClient.waitFor(isIdleOn('s1'));
-  assert.equal(done.state.profileCatalog.find(({ id }) => id === 's1').seatCount, 8);
+  assert.equal(done.state.profileCatalog.find(({ id }) => id === 's1').seatCount, 6);
   assert.equal(done.state.tableModes[0], 0, 'the s2 seat change does not leak into s1');
 
   const s1Room = site.agent.rooms('s1')[0];
-  const roomState = await s1Room.waitFor((m) => m.type === 'systemStateUpdate' && m.state.tableModes.length === 8);
-  assert.deepEqual(roomState.state.tableModes, [0, 0, 0, 0, 0, 0, 0, 0]);
+  const roomState = await s1Room.waitFor((m) => m.type === 'systemStateUpdate' && m.state.tableModes.length === 6);
+  assert.deepEqual(roomState.state.tableModes, [0, 0, 0, 0, 0, 0]);
   assert.equal('groundThemeId' in roomState.state, false);
 
   // 結束時 MadMapper 只剩 s1：s1 區域照存檔（預設全開），s2 的區域與工作燈全關。
@@ -168,7 +168,7 @@ test('switching to s1 gives the s1 room eight reversed seats and binds MadMapper
   assert.equal(site.server.getState().profiles.s2.tableModes[0], 1, 's2 keeps its own seats');
 });
 
-test('a seat change in s1 reaches the s1 room at the reversed index', async (t) => {
+test('a seat change in s1 reaches the s1 room at the same index as the console', async (t) => {
   const site = await startAndSettle(t);
   const consoleClient = await site.connectConsole();
   consoleClient.send({ type: 'switchProfile', profileId: 's1' });
@@ -180,7 +180,7 @@ test('a seat change in s1 reaches the s1 room at the reversed index', async (t) 
   consoleClient.send({ type: 'updateTableMode', tableIndex: 0, mode: 1 });
 
   const update = await s1Room.waitFor((m) => m.type === 'tableModeUpdate');
-  assert.deepEqual(update.tableModes, [0, 0, 0, 0, 0, 0, 0, 1]);
+  assert.deepEqual(update.tableModes, [1, 0, 0, 0, 0, 0]);
   const consoleUpdate = await consoleClient.waitFor((m) => m.type === 'tableModeUpdate');
   assert.deepEqual(consoleUpdate.tableModes, [1, 0, 0, 0, 0, 0, 0, 0, 0]);
 });
@@ -201,6 +201,10 @@ test('s1 rejects seats outside split mode, lights-on and ground themes', async (
   await consoleClient.waitFor((m) => m.type === 'modeUpdate' && m.mode === 8);
   consoleClient.send({ type: 'updateTableMode', tableIndex: 0, mode: 4 });
   assert.equal((await consoleClient.waitFor((m) => m.type === 'commandRejected')).reason, 'seatOutOfRange');
+
+  consoleClient.clear();
+  consoleClient.send({ type: 'updateTableMode', tableIndex: 6, mode: 1 });
+  assert.equal((await consoleClient.waitFor((m) => m.type === 'commandRejected')).reason, 'seatOutOfRange', 's1 has six seats, so seat 7 is out of range');
 
   consoleClient.clear();
   consoleClient.send({ type: 'updateTableMode', tableIndex: 8, mode: 1 });
