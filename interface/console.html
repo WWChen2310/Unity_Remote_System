@@ -2,7 +2,8 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <!-- 鎖住縮放：iOS Safari 不理 user-scalable=no，另有 touch-action 與 gesture 事件攔截（見 lockPageZoom） -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>LE ROOM 控制台</title>
     <link rel="icon" href="assets/Room_logo.ico" type="image/x-icon">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -137,6 +138,95 @@
             transform: translate(-50%, -50%);
             pointer-events: none;
         }
+        /* 預覽本身就是操作區：單指拖曳移動、雙指縮放與旋轉，瀏覽器不得把手勢拿去捲動或縮放 */
+        .logo-preview.logo-editable {
+            touch-action: none;
+            cursor: grab;
+        }
+        .logo-preview.logo-dragging {
+            cursor: grabbing;
+        }
+        .logo-preview .logo-guide {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.18);
+            pointer-events: none;
+        }
+        .logo-preview .logo-guide-v { left: 50%; top: 0; bottom: 0; width: 1px; }
+        .logo-preview .logo-guide-h { top: 50%; left: 0; right: 0; height: 1px; }
+        .logo-preview .logo-hint {
+            position: absolute;
+            left: 8px;
+            bottom: 8px;
+            padding: 3px 8px;
+            border-radius: 6px;
+            background: rgba(0, 0, 0, 0.55);
+            color: #e9ecef;
+            font-size: 12px;
+            pointer-events: none;
+        }
+        .logo-controls {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+        }
+        .logo-control {
+            padding: 12px;
+            background: #f3f6f6;
+            border-radius: 12px;
+        }
+        .logo-control-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 6px;
+        }
+        .logo-control-label {
+            font-size: 14px;
+            font-weight: 600;
+            color: #495057;
+        }
+        .logo-value {
+            font-size: 18px;
+            font-weight: 650;
+            font-variant-numeric: tabular-nums;
+            color: var(--ink);
+        }
+        .logo-control-body {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        /* +／− 長按連續調整；touch-action:none 讓長按不會被當成捲動或選字 */
+        .logo-step {
+            flex: none;
+            width: 52px;
+            min-height: 52px;
+            padding: 0;
+            font-size: 20px;
+            border-radius: 10px;
+            touch-action: none;
+        }
+        .logo-range {
+            flex: 1;
+            min-width: 0;
+            height: 52px;
+            touch-action: none;
+        }
+        .logo-range::-webkit-slider-runnable-track { height: 8px; background-color: #c5d0d2; }
+        .logo-range::-webkit-slider-thumb { width: 32px; height: 32px; margin-top: -12px; }
+        .logo-range::-moz-range-track { height: 8px; background-color: #c5d0d2; }
+        .logo-range::-moz-range-thumb { width: 32px; height: 32px; }
+        .logo-chips {
+            display: flex;
+            gap: 6px;
+            margin-top: 8px;
+        }
+        .logo-chips .btn {
+            flex: 1;
+            min-height: 40px;
+            padding: 4px 0;
+            font-size: 13px;
+        }
         .logo-preview.logo-off img {
             opacity: 0.35;
         }
@@ -148,28 +238,6 @@
             justify-content: center;
             color: #adb5bd;
             font-size: 0.9rem;
-        }
-        .logo-slider-row {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-bottom: 6px;
-        }
-        .logo-slider-row label {
-            min-width: 64px;
-            margin: 0;
-            font-size: 0.9rem;
-            color: #495057;
-        }
-        .logo-slider-row input[type=range] {
-            flex: 1;
-        }
-        .logo-slider-row .logo-value {
-            min-width: 52px;
-            text-align: right;
-            font-variant-numeric: tabular-nums;
-            font-size: 0.85rem;
-            color: #6c757d;
         }
 
         /* 自動循環相關樣式 */
@@ -364,7 +432,7 @@
         #groundCard .mode-btn i { font-size:1.25rem; margin:0; }
         .mode-btn.active, .mode-btn.active:hover, .mask-mode-btn.active, .table-btn.active, .surface-toggle.active { background:var(--accent) !important; border-color:var(--accent) !important; color:white !important; box-shadow:none; }
         .mode-btn:hover, .mask-mode-btn:hover, .surface-toggle:hover { transform:none; box-shadow:none; }
-        button, .surface-toggle { touch-action:manipulation; }
+        html, body, button, .surface-toggle { touch-action:manipulation; }
         .btn, .table-btn, input[type=range] { min-height:44px; }
         input[type=text], input[type=number], select { font-size:16px !important; }
         button:focus-visible, summary:focus-visible { outline:3px solid #aa6d29; outline-offset:3px; }
@@ -396,6 +464,7 @@
             .table-control-grid { grid-template-columns:minmax(0,1fr); }
             .surface-grid { grid-template-columns:repeat(3,minmax(0,1fr)); }
             #groundCard .mode-btn { flex-direction:column; gap:4px; height:76px; }
+            .logo-controls { grid-template-columns:minmax(0,1fr); }
         }
     </style>
 </head>
@@ -615,37 +684,69 @@
                 </div>
 
                 <div class="logo-preview logo-off" id="logoPreview">
+                    <div class="logo-guide logo-guide-v"></div>
+                    <div class="logo-guide logo-guide-h"></div>
                     <img id="logoPreviewImage" alt="" style="display:none;">
                     <div class="logo-empty" id="logoPreviewEmpty">尚未上傳 Logo</div>
+                    <div class="logo-hint" id="logoPreviewHint" style="display:none;">拖曳移動・雙指縮放／旋轉</div>
                 </div>
 
-                <div class="logo-slider-row">
-                    <label for="logoScale">大小</label>
-                    <input type="range" class="form-range" id="logoScale" min="2" max="100" step="1" value="20"
-                           oninput="onLogoSlider('scale', this.value / 100)">
-                    <span class="logo-value" id="logoScaleValue">20%</span>
-                </div>
-                <div class="logo-slider-row">
-                    <label for="logoRotation">角度</label>
-                    <input type="range" class="form-range" id="logoRotation" min="-180" max="180" step="1" value="0"
-                           oninput="onLogoSlider('rotation', Number(this.value))">
-                    <span class="logo-value" id="logoRotationValue">0°</span>
-                </div>
-                <div class="logo-slider-row">
-                    <label for="logoX">水平位置</label>
-                    <input type="range" class="form-range" id="logoX" min="0" max="100" step="1" value="50"
-                           oninput="onLogoSlider('x', this.value / 100)">
-                    <span class="logo-value" id="logoXValue">50%</span>
-                </div>
-                <div class="logo-slider-row">
-                    <label for="logoY">垂直位置</label>
-                    <input type="range" class="form-range" id="logoY" min="0" max="100" step="1" value="50"
-                           oninput="onLogoSlider('y', this.value / 100)">
-                    <span class="logo-value" id="logoYValue">50%</span>
+                <!-- 每個欄位：大數值、長按可連續的 −／+、粗滑桿。欄位定義在 LOGO_FIELDS -->
+                <div class="logo-controls">
+                    <div class="logo-control" data-logo-field="scale">
+                        <div class="logo-control-head">
+                            <span class="logo-control-label">大小</span>
+                            <span class="logo-value" id="logoScaleValue">20%</span>
+                        </div>
+                        <div class="logo-control-body">
+                            <button type="button" class="btn btn-outline-secondary logo-step" data-logo-step="-1" aria-label="縮小"><i class="bi bi-dash-lg"></i></button>
+                            <input type="range" class="form-range logo-range" id="logoScale" min="2" max="100" step="1" value="20" aria-label="大小">
+                            <button type="button" class="btn btn-outline-secondary logo-step" data-logo-step="1" aria-label="放大"><i class="bi bi-plus-lg"></i></button>
+                        </div>
+                    </div>
+                    <div class="logo-control" data-logo-field="rotation">
+                        <div class="logo-control-head">
+                            <span class="logo-control-label">角度</span>
+                            <span class="logo-value" id="logoRotationValue">0°</span>
+                        </div>
+                        <div class="logo-control-body">
+                            <button type="button" class="btn btn-outline-secondary logo-step" data-logo-step="-1" aria-label="逆時針"><i class="bi bi-arrow-counterclockwise"></i></button>
+                            <input type="range" class="form-range logo-range" id="logoRotation" min="-180" max="180" step="1" value="0" aria-label="角度">
+                            <button type="button" class="btn btn-outline-secondary logo-step" data-logo-step="1" aria-label="順時針"><i class="bi bi-arrow-clockwise"></i></button>
+                        </div>
+                        <div class="logo-chips">
+                            <button type="button" class="btn btn-outline-secondary" data-logo-set="rotation" data-logo-value="-90">−90°</button>
+                            <button type="button" class="btn btn-outline-secondary" data-logo-set="rotation" data-logo-value="0">0°</button>
+                            <button type="button" class="btn btn-outline-secondary" data-logo-set="rotation" data-logo-value="90">90°</button>
+                            <button type="button" class="btn btn-outline-secondary" data-logo-set="rotation" data-logo-value="180">180°</button>
+                        </div>
+                    </div>
+                    <div class="logo-control" data-logo-field="x">
+                        <div class="logo-control-head">
+                            <span class="logo-control-label">水平位置</span>
+                            <span class="logo-value" id="logoXValue">50%</span>
+                        </div>
+                        <div class="logo-control-body">
+                            <button type="button" class="btn btn-outline-secondary logo-step" data-logo-step="-1" aria-label="往左"><i class="bi bi-arrow-left"></i></button>
+                            <input type="range" class="form-range logo-range" id="logoX" min="0" max="100" step="0.5" value="50" aria-label="水平位置">
+                            <button type="button" class="btn btn-outline-secondary logo-step" data-logo-step="1" aria-label="往右"><i class="bi bi-arrow-right"></i></button>
+                        </div>
+                    </div>
+                    <div class="logo-control" data-logo-field="y">
+                        <div class="logo-control-head">
+                            <span class="logo-control-label">垂直位置</span>
+                            <span class="logo-value" id="logoYValue">50%</span>
+                        </div>
+                        <div class="logo-control-body">
+                            <button type="button" class="btn btn-outline-secondary logo-step" data-logo-step="-1" aria-label="往上"><i class="bi bi-arrow-up"></i></button>
+                            <input type="range" class="form-range logo-range" id="logoY" min="0" max="100" step="0.5" value="50" aria-label="垂直位置">
+                            <button type="button" class="btn btn-outline-secondary logo-step" data-logo-step="1" aria-label="往下"><i class="bi bi-arrow-down"></i></button>
+                        </div>
+                    </div>
                 </div>
                 <div class="d-flex gap-2 mt-2">
                     <button class="btn btn-sm btn-outline-secondary flex-fill" onclick="resetLogoTransform()">
-                        <i class="bi bi-arrow-counterclockwise"></i> 置中、角度歸零
+                        <i class="bi bi-bullseye"></i> 置中、角度歸零
                     </button>
                 </div>
 
@@ -1543,7 +1644,35 @@
             sendLogo({ type: 'logoControl', target });
         }
 
-        function onLogoSlider(field, value) {
+        // 範圍與 logo-model.js 的 LOGO_LIMITS 相同（伺服器也會再夾一次）。step 是 −／+ 一下的量；
+        // 滑桿用百分比或角度的整數刻度，toInput / fromInput 負責換算。
+        const LOGO_FIELDS = {
+            scale: { input: 'logoScale', min: 0.02, max: 1, step: 0.01,
+                     toInput: v => v * 100, fromInput: v => v / 100, text: v => `${Math.round(v * 100)}%` },
+            rotation: { input: 'logoRotation', min: -180, max: 180, step: 1, wrap: true,
+                        toInput: v => v, fromInput: v => v, text: v => `${Math.round(v)}°` },
+            x: { input: 'logoX', min: 0, max: 1, step: 0.005,
+                 toInput: v => v * 100, fromInput: v => v / 100, text: v => `${(v * 100).toFixed(1)}%` },
+            y: { input: 'logoY', min: 0, max: 1, step: 0.005,
+                 toInput: v => v * 100, fromInput: v => v / 100, text: v => `${(v * 100).toFixed(1)}%` }
+        };
+        // 正在操作中的來源（preview / slider / step）。操作期間伺服器回傳的舊值不覆蓋位置、大小、角度，
+        // 否則拖曳中 Logo 會被拉回上一個值再跳回來。
+        const logoHolds = new Set();
+
+        function normalizeLogoValue(field, value) {
+            const spec = LOGO_FIELDS[field];
+            if (spec.wrap) {
+                while (value > spec.max) value -= 360;
+                while (value < spec.min) value += 360;
+            }
+            const clamped = Math.min(spec.max, Math.max(spec.min, value));
+            return Math.round(clamped * 10000) / 10000;
+        }
+
+        function setLogoField(field, value) {
+            if (!Number.isFinite(value)) return;
+            value = normalizeLogoValue(field, value);
             logoSettings[field] = value;
             logoPending[field] = value;
             renderLogo();
@@ -1562,9 +1691,151 @@
             logoPending = {};
         }
 
-        function resetLogoTransform() {
-            sendLogo({ type: 'logoControl', rotation: 0, x: 0.5, y: 0.5 });
+        function holdLogo(source) {
+            logoHolds.add(source);
         }
+
+        function releaseLogo(source) {
+            if (!logoHolds.delete(source)) return;
+            if (logoHolds.size === 0) {
+                clearTimeout(logoSendTimer);
+                logoSendTimer = null;
+                flushLogoPending();
+            }
+        }
+
+        function resetLogoTransform() {
+            setLogoField('rotation', 0);
+            setLogoField('x', 0.5);
+            setLogoField('y', 0.5);
+        }
+
+        // 滑桿：按下時鎖住伺服器回傳值，放開送出最後一個值。
+        Object.entries(LOGO_FIELDS).forEach(([field, spec]) => {
+            const input = document.getElementById(spec.input);
+            input.addEventListener('pointerdown', () => holdLogo('slider'));
+            input.addEventListener('input', () => setLogoField(field, spec.fromInput(Number(input.value))));
+            input.addEventListener('change', () => releaseLogo('slider'));
+        });
+
+        // −／+：點一下走一格；長按 400 ms 後連續走，連續 20 格後每次走 5 格。
+        // 指標已不在（例如手指在 pointerdown 處理前就離開）時 setPointerCapture 會丟例外；
+        // 抓不到只是拖出元素外會斷，不該讓整個手勢失效。
+        function capturePointer(element, pointerId) {
+            try { element.setPointerCapture(pointerId); } catch { /* 見上 */ }
+        }
+
+        let logoRepeatTimer = null;
+        function stopLogoRepeat() {
+            clearTimeout(logoRepeatTimer);
+            logoRepeatTimer = null;
+            releaseLogo('step');
+        }
+        document.querySelectorAll('.logo-step').forEach(button => {
+            const field = button.closest('[data-logo-field]').dataset.logoField;
+            const direction = Number(button.dataset.logoStep);
+            const stepOnce = multiplier => setLogoField(field, logoSettings[field] + direction * LOGO_FIELDS[field].step * multiplier);
+            button.addEventListener('pointerdown', event => {
+                if (button.disabled || event.button !== 0) return;
+                event.preventDefault();
+                capturePointer(button, event.pointerId);
+                stopLogoRepeat();
+                holdLogo('step');
+                stepOnce(1);
+                let count = 0;
+                const repeat = () => {
+                    count++;
+                    stepOnce(count > 20 ? 5 : 1);
+                    logoRepeatTimer = setTimeout(repeat, 60);
+                };
+                logoRepeatTimer = setTimeout(repeat, 400);
+            });
+            ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(type => button.addEventListener(type, stopLogoRepeat));
+            // 鍵盤（Enter／空白鍵）觸發的 click 沒有 pointerdown，detail 為 0。
+            button.addEventListener('click', event => {
+                if (event.detail === 0) {
+                    stepOnce(1);
+                    flushLogoPending();
+                }
+            });
+        });
+        document.querySelectorAll('[data-logo-set]').forEach(button => {
+            button.addEventListener('click', () => setLogoField(button.dataset.logoSet, Number(button.dataset.logoValue)));
+        });
+        // 放開的位置不在滑桿上時 change 不一定觸發，全域補一次。
+        window.addEventListener('pointerup', () => releaseLogo('slider'));
+        window.addEventListener('pointercancel', () => releaseLogo('slider'));
+
+        // 預覽直接操作：一指拖曳移動（拖畫面任何地方都行，小 Logo 也抓得到）；
+        // 兩指同時縮放、旋轉、移動；滑鼠滾輪縮放。每次手指數改變都重設基準，避免跳動。
+        (function setupLogoPreviewGestures() {
+            const preview = document.getElementById('logoPreview');
+            const pointers = new Map();
+            let base = null;
+
+            const editable = () => Boolean(logoSettings.imageId) && logoImageId === logoSettings.imageId;
+            const pair = () => {
+                const [a, b] = [...pointers.values()];
+                return {
+                    cx: (a.x + b.x) / 2, cy: (a.y + b.y) / 2,
+                    distance: Math.hypot(b.x - a.x, b.y - a.y),
+                    angle: Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI
+                };
+            };
+            const rebase = () => {
+                if (pointers.size === 0) { base = null; return; }
+                const first = pointers.values().next().value;
+                base = {
+                    settings: { scale: logoSettings.scale, rotation: logoSettings.rotation, x: logoSettings.x, y: logoSettings.y },
+                    point: { x: first.x, y: first.y },
+                    pair: pointers.size >= 2 ? pair() : null
+                };
+            };
+            const end = event => {
+                if (!pointers.delete(event.pointerId)) return;
+                rebase();
+                if (pointers.size === 0) {
+                    preview.classList.remove('logo-dragging');
+                    releaseLogo('preview');
+                }
+            };
+
+            preview.addEventListener('pointerdown', event => {
+                if (!editable()) return;
+                event.preventDefault();
+                capturePointer(preview, event.pointerId);
+                pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+                holdLogo('preview');
+                preview.classList.add('logo-dragging');
+                rebase();
+            });
+            preview.addEventListener('pointermove', event => {
+                if (!base || !pointers.has(event.pointerId)) return;
+                pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+                const rect = preview.getBoundingClientRect();
+                if (pointers.size >= 2 && base.pair) {
+                    const now = pair();
+                    setLogoField('x', base.settings.x + (now.cx - base.pair.cx) / rect.width);
+                    setLogoField('y', base.settings.y + (now.cy - base.pair.cy) / rect.height);
+                    if (base.pair.distance > 10) setLogoField('scale', base.settings.scale * now.distance / base.pair.distance);
+                    // 螢幕 y 軸向下，atan2 增加就是順時針，與 rotation 的定義一致。
+                    setLogoField('rotation', base.settings.rotation + now.angle - base.pair.angle);
+                } else {
+                    const point = pointers.values().next().value;
+                    setLogoField('x', base.settings.x + (point.x - base.point.x) / rect.width);
+                    setLogoField('y', base.settings.y + (point.y - base.point.y) / rect.height);
+                }
+            });
+            ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(type => preview.addEventListener(type, end));
+            preview.addEventListener('wheel', event => {
+                if (!editable()) return;
+                event.preventDefault();
+                holdLogo('preview-wheel');
+                setLogoField('scale', logoSettings.scale * Math.exp(-event.deltaY * 0.002));
+                clearTimeout(preview.wheelTimer);
+                preview.wheelTimer = setTimeout(() => releaseLogo('preview-wheel'), 200);
+            }, { passive: false });
+        })();
 
         function removeLogo() {
             if (!logoSettings.imageId) return;
@@ -1610,8 +1881,12 @@
 
         function applyLogoSettings(logo) {
             if (!logo) return;
-            // 自己還沒送出的滑桿值優先，避免伺服器回來的舊值把滑桿拉回去。
-            logoSettings = { ...logoSettings, ...logo, ...logoPending };
+            // 自己還沒送出的值優先；操作中連已送出的位置、大小、角度也以本機為準，避免伺服器回來的舊值把 Logo 拉回去。
+            const held = {};
+            if (logoHolds.size > 0) {
+                Object.keys(LOGO_FIELDS).forEach(field => { held[field] = logoSettings[field]; });
+            }
+            logoSettings = { ...logoSettings, ...logo, ...held, ...logoPending };
             if (logoSettings.imageId && logoSettings.imageId !== logoImageId) {
                 sendLogo({ type: 'requestLogoImage' });
             }
@@ -1650,17 +1925,17 @@
             });
             document.getElementById('logoPreview').style.aspectRatio = target === 'ground' ? '1 / 1' : '';
 
-            const percent = v => Math.round(v * 100);
-            const sliders = {
-                scale: { id: 'logoScale', toInput: percent, text: v => `${percent(v)}%` },
-                rotation: { id: 'logoRotation', toInput: Math.round, text: v => `${Math.round(v)}°` },
-                x: { id: 'logoX', toInput: percent, text: v => `${percent(v)}%` },
-                y: { id: 'logoY', toInput: percent, text: v => `${percent(v)}%` }
-            };
-            Object.entries(sliders).forEach(([field, slider]) => {
-                const input = document.getElementById(slider.id);
-                if (document.activeElement !== input) input.value = slider.toInput(logoSettings[field]);
-                document.getElementById(`${slider.id}Value`).textContent = slider.text(logoSettings[field]);
+            Object.entries(LOGO_FIELDS).forEach(([field, spec]) => {
+                const input = document.getElementById(spec.input);
+                // 正在拖的滑桿不回寫，否則刻度換算的捨入會讓拇指抖動。
+                if (!(logoHolds.has('slider') && document.activeElement === input)) {
+                    input.value = spec.toInput(logoSettings[field]);
+                }
+                input.disabled = !hasImage;
+                document.getElementById(`${spec.input}Value`).textContent = spec.text(logoSettings[field]);
+            });
+            document.querySelectorAll('#logoCard .logo-step, #logoCard [data-logo-set]').forEach(button => {
+                button.disabled = !hasImage;
             });
 
             // 預覽與 Unity 同一套定義：scale 是 Logo 高度佔畫面高度的比例，中心在 (x, y)，順時針旋轉。
@@ -1668,6 +1943,8 @@
             const image = document.getElementById('logoPreviewImage');
             const showImage = hasImage && logoImageId === logoSettings.imageId && image.naturalHeight > 0;
             preview.classList.toggle('logo-off', !enabled);
+            preview.classList.toggle('logo-editable', showImage);
+            document.getElementById('logoPreviewHint').style.display = showImage ? '' : 'none';
             document.getElementById('logoPreviewEmpty').style.display = showImage ? 'none' : '';
             image.style.display = showImage ? '' : 'none';
             if (showImage) {
@@ -1680,7 +1957,31 @@
             }
         }
 
-        window.addEventListener('resize', renderLogo);
+        // Logo 尺寸依預覽框高度換算。圖常在 Logo 頁籤隱藏時載入（高度 0），
+        // 所以監看預覽框本身：切到頁籤、轉向、改視窗大小都會重算。
+        new ResizeObserver(renderLogo).observe(document.getElementById('logoPreview'));
+
+        //#endregion
+
+        //#region zoom lock
+
+        // 現場用平板操作，誤觸縮放後按鈕會跑出畫面。viewport 的 user-scalable=no 在 iOS Safari 無效，
+        // 所以：雙擊縮放靠 CSS touch-action:manipulation；雙指縮放擋 Safari 的 gesture 事件與多指 touchmove；
+        // 桌機擋 Ctrl＋滾輪（觸控板捏合也是這個）與 Ctrl＋＋／－／0。
+        (function lockPageZoom() {
+            const block = event => event.preventDefault();
+            ['gesturestart', 'gesturechange', 'gestureend'].forEach(type =>
+                document.addEventListener(type, block, { passive: false }));
+            document.addEventListener('touchmove', event => {
+                if (event.touches.length > 1) event.preventDefault();
+            }, { passive: false });
+            document.addEventListener('wheel', event => {
+                if (event.ctrlKey) event.preventDefault();
+            }, { passive: false });
+            document.addEventListener('keydown', event => {
+                if ((event.ctrlKey || event.metaKey) && ['+', '=', '-', '_', '0'].includes(event.key)) event.preventDefault();
+            });
+        })();
 
         //#endregion
 
