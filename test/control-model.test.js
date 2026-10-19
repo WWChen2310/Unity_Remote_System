@@ -36,7 +36,7 @@ function createValidConfig() {
           { name: 'Main-2', group: '模式二', oscAddress: '/surfaces/Main-2' },
         ],
         lights: [
-          { name: 'Light1-s1', oscAddress: '/surfaces/S1/Light1-S1' },
+          { name: 'Light1-s1', oscAddress: '/surfaces/S1/Light1-s1' },
         ],
       },
       s2: {
@@ -49,8 +49,8 @@ function createValidConfig() {
           { name: 'Ground', oscAddress: '/surfaces/Ground' },
         ],
         lights: [
-          { name: 'Light1-s2', oscAddress: '/surfaces/S2/Light1-S2' },
-          { name: 'Light2-s2', oscAddress: '/surfaces/S2/Light2-S2' },
+          { name: 'Light1-s2', oscAddress: '/surfaces/S2/Light1-s2' },
+          { name: 'Light2-s2', oscAddress: '/surfaces/S2/Light2-s2' },
         ],
       },
     },

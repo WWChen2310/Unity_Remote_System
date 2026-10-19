@@ -6,7 +6,7 @@
 - `madmapper.config.json` 是 MadMapper OSC 的唯一部署設定來源。請在 Node JSON 內修改 `ip`、`port`、`localPort`，以及每個區域完整的 `oscAddress`；OSC Address 不在 Unity Inspector 編輯。
 - 區域與工作燈都依投影方案分組：區域寫在 `profiles.<id>.areas`，工作燈寫在 `profiles.<id>.lights`（2026-10 起每版各自一組，預設各三盞）。舊格式（頂層 `areas` 或頂層 `lights`）會讓伺服器拒絕啟動，請改成新格式。
 - 每個區域與工作燈有三個欄位：`name` 是狀態檔與控制台指令用的 key（例如 `Main-s1`，跨版本不可重複，不要隨意改名），`label` 是控制台按鈕上的字，`oscAddress` 是實際送給 MadMapper 的位址。
-- MadMapper 的位址格式為 `/surfaces/<版本>/<名稱>-<版本>/opacity`，版本為大寫 `S1`、`S2`，例如 `/surfaces/S1/Main-S1/opacity`、`/surfaces/S2/Main-S2/opacity`、`/surfaces/S1/Light1-S1/opacity`。完整 `oscAddress` 字串皆可依 MadMapper 實際命名修改（在 MadMapper 右鍵 Copy OSC Address 對照）。
+- MadMapper 的位址格式為 `/surfaces/<版本>/<名稱>-<版本>/opacity`，資料夾那層的版本為大寫 `S1`、`S2`，名稱尾碼的版本為小寫 `s1`、`s2`（與 `name` 一致），例如 `/surfaces/S1/Main-s1/opacity`、`/surfaces/S2/Main-s2/opacity`、`/surfaces/S1/Light1-s1/opacity`。完整 `oscAddress` 字串皆可依 MadMapper 實際命名修改（在 MadMapper 右鍵 Copy OSC Address 對照）。
 - 第一版（2026-03，內部代號 s1）：區域 `Main-s1`、`T1-s1`～`T5-s1`（控制台顯示 `Main`、`T1`～`T5`，預設開啟，不分組），工作燈 `Light1-s1`～`Light3-s1`。
 - 第二版（2026-07，內部代號 s2）：區域依序為 `Main-s2`、`T1-s2`、`T2-s2`、`T3-s2`、`T4-s2`、`Ground-s2`（控制台顯示 `Main`、`T1`、`T2`、`T3`、`T4`、`Ground`），工作燈 `Light1-s2`～`Light3-s2`。
 - 舊狀態檔的遷移：2026-10 以前區域用短名稱 `Main`、`T1`… 當 key，Node 讀到時沿用到第二版的新名稱；第一版舊的 `Main-1`… 無法對應，回到預設的開啟。工作燈以前兩版共用（`Light1`…），讀到時把開關帶到兩個版本同編號的燈。
