@@ -11,6 +11,9 @@ const { startServer, loadConfigs } = require('../server-app');
 const { FakeSiteAgent } = require('../tools/fake-site-agent');
 
 const configs = loadConfigs(path.join(__dirname, '..'), {});
+// 對齊 MadMapper 一次送的訊息數：每版的區域、工作燈與 others 各一則。
+const ALIGNMENT_MESSAGES = Object.values(configs.madmapper.profiles)
+  .reduce((count, { areas, lights, others }) => count + areas.length + lights.length + others.length, 0);
 
 function connectClient(t, url, hello) {
   const ws = new WebSocket(url);
@@ -303,7 +306,7 @@ test('on start the server turns the other profile off and the active one on as s
 
   const sent = new Map(site.oscLog.map(({ address, args }) => [address, args[0].value]));
   // s1：6 區域 + 4 盞燈；s2：6 區域 + 3 盞燈。
-  assert.equal(site.oscLog.length, (6 + 4) + (6 + 3));
+  assert.equal(site.oscLog.length, ALIGNMENT_MESSAGES);
   assert.equal(sent.get('/surfaces/S1/Main-s1/opacity'), 0, 's1 is not active, so it is off');
   assert.equal(sent.get('/surfaces/S2/Main-s2/opacity'), 0, 's2 areas default to off');
   // 舊狀態檔共用的 Light2 帶到兩個版本各自的 2 號燈；只有目前方案的會亮。
@@ -315,7 +318,7 @@ test('on start the server turns the other profile off and the active one on as s
   site.oscLog.length = 0;
   site.agent.start();
   await waitUntil(() => site.server.getRooms().length === 2);
-  await waitUntil(() => site.oscLog.length === (6 + 4) + (6 + 3));
+  await waitUntil(() => site.oscLog.length === ALIGNMENT_MESSAGES);
   const aligned = new Map(site.oscLog.map(({ address, args }) => [address, args[0].value]));
   assert.equal(aligned.get('/surfaces/S1/Main-s1/opacity'), 0, 'the agent connecting aligns MadMapper again');
 });

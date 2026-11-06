@@ -65,3 +65,45 @@ test('every profile reaches its own areas and work lights through one target map
   }
   assert.equal(validated.profiles.s1.targetMap['Light1-s2'], undefined, 'lights are not shared between profiles');
 });
+
+// others：MadMapper 專案裡其他跟著版本開關的內容，控制台不顯示、不存開關。
+test('others are optional, need only an oscAddress, and stay out of the target map', () => {
+  // 現場的 others 內容會隨 MadMapper 專案增減，這裡只檢查每筆都是能送出的位址。
+  const shipped = validateMadmapperConfig(require('../madmapper.config.json'));
+  for (const [profileId, { others }] of Object.entries(shipped.profiles)) {
+    assert.ok(Array.isArray(others), profileId);
+    assert.ok(others.every(({ oscAddress }) => oscAddress.startsWith('/')), profileId);
+  }
+
+  const config = JSON.parse(JSON.stringify(require('../madmapper.config.json')));
+  delete config.profiles.s2.others;
+  config.profiles.s1.others = [
+    { oscAddress: '/surfaces/S1/Deco-s1/opacity' },
+    { name: 'Video-s1', oscAddress: '/medias/S1/Video-s1/opacity' },
+  ];
+  const validated = validateMadmapperConfig(config);
+
+  assert.deepEqual(validated.profiles.s1.others, [
+    { name: '/surfaces/S1/Deco-s1/opacity', oscAddress: '/surfaces/S1/Deco-s1/opacity' },
+    { name: 'Video-s1', oscAddress: '/medias/S1/Video-s1/opacity' },
+  ]);
+  assert.deepEqual(validated.profiles.s2.others, []);
+  assert.equal(validated.profiles.s1.targetMap['Video-s1'], undefined, 'the console cannot toggle others');
+});
+
+test('others are rejected when malformed or listed in both profiles', () => {
+  const base = () => JSON.parse(JSON.stringify(require('../madmapper.config.json')));
+
+  const notArray = base();
+  notArray.profiles.s1.others = { oscAddress: '/a' };
+  assert.throws(() => validateMadmapperConfig(notArray), /others must be an array/);
+
+  const noSlash = base();
+  noSlash.profiles.s1.others = [{ oscAddress: 'surfaces/S1/Deco-s1/opacity' }];
+  assert.throws(() => validateMadmapperConfig(noSlash), /oscAddress must be nonempty and start with a slash/);
+
+  const shared = base();
+  shared.profiles.s1.others = [{ oscAddress: '/surfaces/Shared/opacity' }];
+  shared.profiles.s2.others = [{ oscAddress: '/surfaces/Shared/opacity' }];
+  assert.throws(() => validateMadmapperConfig(shared), /listed twice/);
+});

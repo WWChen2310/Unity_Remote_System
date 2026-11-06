@@ -1,6 +1,6 @@
 'use strict';
 
-const { createMadmapperOscMessage } = require('./control-model');
+const { createMadmapperOscMessage, createOpacityMessage } = require('./control-model');
 
 /** 切換步驟，依序執行；控制台用同一組名稱顯示進度。 */
 const SWITCH_STEPS = Object.freeze(['blackout', 'starting', 'waitingForRooms', 'settling', 'restoring']);
@@ -13,6 +13,7 @@ const SWITCH_STEPS = Object.freeze(['blackout', 'starting', 'waitingForRooms', '
  * 任何一步失敗就停在 failed，區域維持 0，不自動重試：交給操作者決定重試或回到原方案。
  *
  * MadMapper 與方案綁定：只有目前方案的區域與工作燈會亮，其他方案一律關閉（控制台也鎖住）。
+ * 設定檔的 others（控制台看不到的其他內容）跟著區域一起關、一起開。
  * 換到另一版時，目標方案的區域與工作燈存檔先全部設為開；工作燈在熄燈時就打開，切換途中現場仍有照明。
  *
  * activeProfile 在第一步就改成目標：新的 Unity 一連上就會收到狀態，那一刻必須已是目標方案的 view。
@@ -155,21 +156,25 @@ class ProfileSwitcher {
   }
 
   /**
-   * 送出整套 MadMapper 開關：其他方案的區域與工作燈全關；目前方案的工作燈照存檔，
-   * 區域在 areasOn 時照存檔、否則全關（切換中熄燈）。存檔本身不改。
+   * 送出整套 MadMapper 開關：其他方案的區域、工作燈與 others 全關；目前方案的工作燈照存檔，
+   * 區域在 areasOn 時照存檔、否則全關（切換中熄燈），others 跟區域同時開關（沒有存檔，開就是 1）。
+   * 存檔本身不改。
    */
   applyMadmapper(activeProfileId, { areasOn }) {
     const saved = this.store.get().profiles[activeProfileId];
-    const others = this.profiles.ids.filter((profileId) => profileId !== activeProfileId);
-    this.log(`MadMapper: ${others.join(', ')} off; ${activeProfileId} areas ${areasOn ? 'as saved' : 'off'}, lights as saved`);
+    const otherProfiles = this.profiles.ids.filter((profileId) => profileId !== activeProfileId);
+    this.log(`MadMapper: ${otherProfiles.join(', ')} off; ${activeProfileId} areas and others ${areasOn ? 'on (areas as saved)' : 'off'}, lights as saved`);
     for (const profileId of this.profiles.ids) {
-      const { areas, lights, targetMap } = this.madmapper.profiles[profileId];
+      const { areas, lights, others, targetMap } = this.madmapper.profiles[profileId];
       const isActive = profileId === activeProfileId;
       for (const { name } of areas) {
         this.sendOsc(createMadmapperOscMessage(targetMap, name, isActive && areasOn && saved.surfaceStates[name] === true));
       }
       for (const { name } of lights) {
         this.sendOsc(createMadmapperOscMessage(targetMap, name, isActive && saved.lightStates[name] === true));
+      }
+      for (const { oscAddress } of others) {
+        this.sendOsc(createOpacityMessage(oscAddress, isActive && areasOn));
       }
     }
   }

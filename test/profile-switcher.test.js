@@ -17,9 +17,10 @@ function createHarness({
   agentBehaviour = async (type, payload) => ({ started: [{ name: payload.profileId, pid: 1 }] }),
   presenceBehaviour = async () => {},
   initial = {},
+  madmapperConfig = madmapper,
 } = {}) {
   const log = [];
-  let state = migrateSystemState(initial, { profiles, madmapper });
+  let state = migrateSystemState(initial, { profiles, madmapper: madmapperConfig });
   let clock = 1000;
 
   const switcher = new ProfileSwitcher({
@@ -31,7 +32,7 @@ function createHarness({
       },
     },
     profiles,
-    madmapper,
+    madmapper: madmapperConfig,
     sendOsc: (message) => log.push({ kind: 'osc', address: message.address, value: message.args[0].value }),
     agent: {
       request: async (type, payload) => {
@@ -164,6 +165,47 @@ test('restarting the active profile keeps its saved switches', async () => {
   assert.equal(restore[addressOf('Main-s2')], 1);
   assert.equal(restore[addressOf('T2-s2')], 0, 'an area saved off stays off');
   assert.equal(JSON.stringify(getState().profiles), before);
+});
+
+// 設定檔的 others：控制台看不到，跟著該版區域一起關、一起開。
+const OTHERS = {
+  s1: ['/surfaces/S1/Deco-s1/opacity', '/medias/S1/Video-s1/opacity'],
+  s2: ['/surfaces/S2/Deco-s2/opacity'],
+};
+const withOthers = (() => {
+  const raw = JSON.parse(JSON.stringify(require('../madmapper.config.json')));
+  for (const [profileId, addresses] of Object.entries(OTHERS)) {
+    raw.profiles[profileId].others = addresses.map((oscAddress) => ({ oscAddress }));
+  }
+  return validateMadmapperConfig(raw);
+})();
+
+test('others go off with every area at the blackout and come on with the target areas', async () => {
+  const { switcher, log } = createHarness({ initial: s1Initial, madmapperConfig: withOthers });
+
+  await switcher.switchTo('s1');
+  const { before: blackout, after: restore } = oscPhases(log);
+
+  for (const address of [...OTHERS.s1, ...OTHERS.s2]) {
+    assert.equal(blackout[address], 0, `${address} is off during the switch`);
+  }
+  for (const address of OTHERS.s1) assert.equal(restore[address], 1, `${address} comes on with s1`);
+  for (const address of OTHERS.s2) assert.equal(restore[address], 0, `${address} stays off with s2`);
+});
+
+test('others stay off after a failed switch and follow the active profile on ensureActive', async () => {
+  const failed = createHarness({
+    madmapperConfig: withOthers,
+    presenceBehaviour: async () => { throw new Error('timeout'); },
+  });
+  await failed.switcher.switchTo('s1');
+  assert.deepEqual(oscPhases(failed.log).after, {}, 'nothing comes on after a failure');
+
+  const ensured = createHarness({ madmapperConfig: withOthers, agentBehaviour: async () => ({ started: [] }) });
+  await ensured.switcher.ensureActive();
+  const { after } = oscPhases(ensured.log);
+  for (const address of OTHERS.s2) assert.equal(after[address], 1);
+  for (const address of OTHERS.s1) assert.equal(after[address], 0);
 });
 
 test('a failed switch leaves every area off', async () => {

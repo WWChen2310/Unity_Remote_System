@@ -6,6 +6,13 @@
 - `madmapper.config.json` 是 MadMapper OSC 的唯一部署設定來源。請在 Node JSON 內修改 `ip`、`port`、`localPort`，以及每個區域完整的 `oscAddress`；OSC Address 不在 Unity Inspector 編輯。
 - 區域與工作燈都依投影方案分組：區域寫在 `profiles.<id>.areas`，工作燈寫在 `profiles.<id>.lights`（2026-10 起每版各自一組，預設各三盞）。舊格式（頂層 `areas` 或頂層 `lights`）會讓伺服器拒絕啟動，請改成新格式。
 - 每個區域與工作燈有三個欄位：`name` 是狀態檔與控制台指令用的 key（例如 `Main-s1`，跨版本不可重複，不要隨意改名），`label` 是控制台按鈕上的字，`oscAddress` 是實際送給 MadMapper 的位址。
+- 其他要跟著版本開關、但不需要在控制台個別操作的 MadMapper 內容，寫在 `profiles.<id>.others`，每筆只要 `oscAddress`（`name` 可省略，只用在錯誤訊息）。它們與該版的區域一起開關：切換熄燈時關、新版本就緒時開（送 1），另一版一律關（送 0）；Node 啟動與 agent 連線時也一起對齊。不顯示在控制台、不存在狀態檔，同一個位址不能同時列在兩版。例如：
+
+  ```json
+  "others": [
+    { "name": "Deco-s1", "oscAddress": "/surfaces/S1/Deco-s1/opacity" }
+  ]
+  ```
 - MadMapper 的位址格式為 `/surfaces/<版本>/<名稱>-<版本>/opacity`，資料夾那層的版本為大寫 `S1`、`S2`，名稱尾碼的版本為小寫 `s1`、`s2`（與 `name` 一致），例如 `/surfaces/S1/Main-s1/opacity`、`/surfaces/S2/Main-s2/opacity`、`/surfaces/S1/Light1-s1/opacity`。完整 `oscAddress` 字串皆可依 MadMapper 實際命名修改（在 MadMapper 右鍵 Copy OSC Address 對照）。
 - 第一版（2026-03，內部代號 s1）：區域 `Main-s1`、`T1-s1`～`T5-s1`（控制台顯示 `Main`、`T1`～`T5`，預設開啟，不分組），工作燈 `Light1-s1`～`Light4-s1`（第一版四盞，第二版三盞）。
 - 第二版（2026-07，內部代號 s2）：區域依序為 `Main-s2`、`T1-s2`、`T2-s2`、`T3-s2`、`T4-s2`、`Ground-s2`（控制台顯示 `Main`、`T1`、`T2`、`T3`、`T4`、`Ground`），工作燈 `Light1-s2`～`Light3-s2`。
@@ -51,7 +58,7 @@ Web 伺服器必須同時部署 `interface/console.html` 與 `interface/control-
 
 切換流程：熄燈（所有區域關閉、另一版工作燈關閉、新方案工作燈全開）→ 關掉舊的 Unity、啟動新的 → 等新方案的每個實例都連上 → 等畫面穩定 → 打開新方案的全部區域。全程約 1–2 分鐘，期間播放相關控制（背景、座位、地面、區域、切換）暫停，目前版本的工作燈仍可操作。兩個方案各自保存背景與座位，切回來時恢復上次的狀態；區域（含桌子 T1–T4／T5 與 Ground）與工作燈則在換到另一版時一律全開，不沿用上次離開時的開關。在同一版按「重新啟動目前方案」或失敗後重試同一版，沿用目前存的開關。切換失敗時區域維持關閉，按「重試」或「回到原方案」成功後才恢復。
 
-**MadMapper 與版本綁定**：MadMapper 上同一時間只有目前版本的區域與工作燈會亮，另一版一律關閉；控制台兩版都顯示，但另一版鎖住（顯示「鎖住」，不能開關），伺服器也會拒絕（`notInProfile`）。另一版存檔的開關保留，但切回該版時區域與工作燈會全開。Node 啟動與 agent 連線時都會重新對齊一次（目前版本照存檔、另一版全關），MadMapper 重開後與控制台一致。
+**MadMapper 與版本綁定**：MadMapper 上同一時間只有目前版本的區域、工作燈與 `others` 會亮，另一版一律關閉；控制台兩版都顯示，但另一版鎖住（顯示「鎖住」，不能開關），伺服器也會拒絕（`notInProfile`）。另一版存檔的開關保留，但切回該版時區域與工作燈會全開。Node 啟動與 agent 連線時都會重新對齊一次（目前版本照存檔、另一版全關），MadMapper 重開後與控制台一致。
 
 **物件追蹤遮罩與版本綁定**：以前 ObjectTracker 有分散模式、合併模式兩張遮罩由控制台切換，現在改成第一版、第二版各一張，跟著版本自動切換，控制台不能另外指定（`maskControl` 會被拒絕，`maskFollowsProfile`）。`profiles.config.json` 每個方案的 `maskId` 決定用追蹤端 `maskTextures` 的第幾張（1 起算，第一版 `1`、第二版 `2`）；舊欄位 `defaultMaskId` 會讓伺服器拒絕啟動，請改名為 `maskId`。追蹤端照舊從 `systemStateUpdate.state.maskMode` 取值，切換一開始就會收到新版本的遮罩。ObjectTracker 場景裡 `ObjectDetector.maskTextures` 的第 1 張放第一版遮罩、第 2 張放第二版遮罩，尺寸須與深度影像相同（目前 1024×1024）。
 

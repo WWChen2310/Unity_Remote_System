@@ -75,6 +75,8 @@ function validateMadmapperConfig(config) {
 
   // 名稱是狀態檔與控制台指令的 key，跨方案、跨區域與工作燈都不能重複。
   const usedNames = new Set();
+  // 同一個位址若出現在兩版的 others，切換時會被同時關與開，所以不允許。
+  const usedOtherAddresses = new Map();
   const profiles = {};
   for (const [profileId, profileConfig] of Object.entries(config.profiles)) {
     if (!PROFILE_ID_PATTERN.test(profileId)) {
@@ -89,6 +91,9 @@ function validateMadmapperConfig(config) {
     if (profileConfig.lights !== undefined && !Array.isArray(profileConfig.lights)) {
       throw new TypeError(`MadMapper profile "${profileId}" lights must be an array`);
     }
+    if (profileConfig.others !== undefined && !Array.isArray(profileConfig.others)) {
+      throw new TypeError(`MadMapper profile "${profileId}" others must be an array`);
+    }
 
     // 工作燈與投影區域對 MadMapper 來說都只是「一個 OSC address 收 0/1」，
     // 所以驗證、狀態保存、送 OSC 共用同一條路徑，只有介面分區顯示不同。
@@ -98,6 +103,11 @@ function validateMadmapperConfig(config) {
     const lights = (profileConfig.lights || []).map((light, index) => (
       normalizeTarget(light, index, `light of profile "${profileId}"`, usedNames)
     ));
+    // others：MadMapper 專案裡其他要跟著版本開關的東西，控制台不顯示、也不存開關，
+    // 切換時與該版區域一起關、一起開（見 profile-switcher 的 applyMadmapper）。
+    const others = (profileConfig.others || []).map((other, index) => (
+      normalizeOther(other, index, profileId, usedOtherAddresses)
+    ));
     const areaMap = Object.fromEntries(areas.map((area) => [area.name, area]));
     const lightMap = Object.fromEntries(lights.map((light) => [light.name, light]));
 
@@ -106,6 +116,7 @@ function validateMadmapperConfig(config) {
       areaMap,
       lights,
       lightMap,
+      others,
       targetMap: { ...areaMap, ...lightMap },
     };
   }
@@ -172,6 +183,29 @@ function validateMadmapperTarget(entry, index, kind) {
   return { name, oscAddress };
 }
 
+/** others 只需要 oscAddress；name 可省略，只用在錯誤訊息與 log。 */
+function normalizeOther(entry, index, profileId, usedOtherAddresses) {
+  const kind = `other of profile "${profileId}"`;
+  if (!isPlainObject(entry)) {
+    throw new TypeError(`MadMapper ${kind} at index ${index} must be an object`);
+  }
+  const { oscAddress } = entry;
+  const name = entry.name === undefined ? oscAddress : entry.name;
+  if (typeof name !== 'string' || name === '') {
+    throw new TypeError(`MadMapper ${kind} at index ${index} name must be a nonempty string`);
+  }
+  if (typeof oscAddress !== 'string' || !oscAddress.startsWith('/')) {
+    throw new TypeError(`MadMapper ${kind} "${name}" oscAddress must be nonempty and start with a slash (/)`);
+  }
+  if (usedOtherAddresses.has(oscAddress)) {
+    throw new Error(
+      `MadMapper others address "${oscAddress}" is listed twice (profiles "${usedOtherAddresses.get(oscAddress)}" and "${profileId}")`,
+    );
+  }
+  usedOtherAddresses.set(oscAddress, profileId);
+  return { name, oscAddress };
+}
+
 function validatePort(value, fieldName) {
   if (!Number.isInteger(value) || value < 1 || value > 65535) {
     throw new RangeError(`MadMapper ${fieldName} must be an integer from 1 to 65535`);
@@ -190,10 +224,12 @@ function createMadmapperOscMessage(areaMap, areaName, enabled) {
     return null;
   }
 
-  const area = areaMap[areaName];
+  return createOpacityMessage(areaMap[areaName].oscAddress, enabled);
+}
 
+function createOpacityMessage(oscAddress, enabled) {
   return {
-    address: area.oscAddress,
+    address: oscAddress,
     args: [{ type: 'f', value: enabled ? 1.0 : 0.0 }],
   };
 }
@@ -211,4 +247,5 @@ module.exports = {
   validateMadmapperConfig,
   normalizeSurfaceStates,
   createMadmapperOscMessage,
+  createOpacityMessage,
 };
